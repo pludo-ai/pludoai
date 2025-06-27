@@ -109,16 +109,15 @@ class VercelService {
     return this.request(`/v6/deployments?projectId=${projectId}&limit=10`);
   }
 
-  async waitForDeployment(projectId: string, maxWaitTime = 900000): Promise<string> {
+  async waitForDeployment(projectId: string, maxWaitTime = 120000): Promise<string> {
     const startTime = Date.now();
     let lastState = '';
     let deploymentFound = false;
-    let triggerAttempted = false;
     
     console.log('⏳ Waiting for automatic deployment to start...');
     
     // Wait for automatic deployment to be triggered by GitHub webhook
-    const deploymentWaitTime = 120000; // 2 minutes for auto-deployment
+    const deploymentWaitTime = 60000; // 1 minute for auto-deployment
     while (!deploymentFound && (Date.now() - startTime) < deploymentWaitTime) {
       try {
         const { deployments } = await this.getDeployments(projectId);
@@ -130,19 +129,19 @@ class VercelService {
         }
         
         console.log('⏳ Waiting for automatic deployment...');
-        await new Promise(resolve => setTimeout(resolve, 15000));
+        await new Promise(resolve => setTimeout(resolve, 10000));
       } catch (error) {
         console.error('Error checking for deployments:', error);
-        await new Promise(resolve => setTimeout(resolve, 15000));
+        await new Promise(resolve => setTimeout(resolve, 10000));
       }
     }
 
     if (!deploymentFound) {
-      // Return error to trigger the file push mechanism
+      // Return error to trigger manual intervention
       const project = await this.getProject(projectId);
       const projectUrl = `https://vercel.com/dashboard/projects/${project.id}`;
       
-      throw new Error(`Automatic deployment did not start. Please visit your Vercel dashboard at ${projectUrl} to manually trigger the deployment. The project has been created successfully and is ready to deploy.`);
+      throw new Error(`Automatic deployment did not start within 1 minute. Manual trigger may be needed. Dashboard: ${projectUrl}`);
     }
     
     // Monitor the deployment progress
@@ -184,14 +183,14 @@ class VercelService {
         console.error('Error checking deployment status:', error);
       }
       
-      // Wait 20 seconds before checking again
-      await new Promise(resolve => setTimeout(resolve, 20000));
+      // Wait 15 seconds before checking again
+      await new Promise(resolve => setTimeout(resolve, 15000));
     }
     
     // If we timeout, provide the project URL for manual intervention
     const project = await this.getProject(projectId);
     const projectUrl = `https://vercel.com/dashboard/projects/${project.id}`;
-    throw new Error(`Deployment timeout. Please visit ${projectUrl} to check the deployment status and manually trigger if needed.`);
+    throw new Error(`Deployment timeout after ${maxWaitTime/1000} seconds. Please visit ${projectUrl} to check the deployment status and manually trigger if needed.`);
   }
 
   // Helper method to check if a project exists

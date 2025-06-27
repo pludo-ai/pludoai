@@ -15,14 +15,17 @@ import {
   Github,
   Download,
   CheckCircle,
-  ExternalLink
+  ExternalLink,
+  Zap,
+  Copy,
+  AlertCircle
 } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Textarea } from '../components/ui/Textarea';
 import { Card } from '../components/ui/Card';
 import { useAuthStore } from '../store/authStore';
-import { generateAgentCode, uploadToGitHub, deployToVercel, downloadAgentFiles } from '../lib/deployment';
+import { generateAgentCode, uploadToGitHub, deployToVercel, downloadAgentFiles, triggerDeploymentWithFile } from '../lib/deployment';
 import { supabase } from '../lib/supabase';
 import toast from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
@@ -47,6 +50,8 @@ export const Create: React.FC = () => {
   const [githubRepo, setGithubRepo] = useState<string | null>(null);
   const [vercelUrl, setVercelUrl] = useState<string | null>(null);
   const [embedCode, setEmbedCode] = useState<string | null>(null);
+  const [showManualTrigger, setShowManualTrigger] = useState(false);
+  const [triggerLoading, setTriggerLoading] = useState(false);
 
   const [deploymentSteps, setDeploymentSteps] = useState<DeploymentStep[]>([
     {
@@ -93,6 +98,7 @@ export const Create: React.FC = () => {
     primaryColor: '#3b82f6',
     tone: 'professional',
     avatar: null as File | null,
+    avatarUrl: '',
     
     // Settings
     subdomain: '',
@@ -203,24 +209,38 @@ export const Create: React.FC = () => {
       }
 
       try {
-        // Upload to Supabase Storage
+        // Create a unique filename
         const fileExt = file.name.split('.').pop();
         const fileName = `${user?.id}-${Date.now()}.${fileExt}`;
         
+        // Upload to Supabase Storage
         const { data, error } = await supabase.storage
           .from('avatars')
-          .upload(fileName, file);
+          .upload(fileName, file, {
+            cacheControl: '3600',
+            upsert: false
+          });
 
-        if (error) throw error;
+        if (error) {
+          console.error('Storage upload error:', error);
+          throw error;
+        }
 
+        // Get public URL
         const { data: { publicUrl } } = supabase.storage
           .from('avatars')
           .getPublicUrl(fileName);
 
-        setFormData(prev => ({ ...prev, avatar: file }));
+        setFormData(prev => ({ 
+          ...prev, 
+          avatar: file,
+          avatarUrl: publicUrl
+        }));
+        
         toast.success('Avatar uploaded successfully!');
       } catch (error: any) {
-        toast.error('Failed to upload avatar: ' + error.message);
+        console.error('Avatar upload error:', error);
+        toast.error('Failed to upload avatar: ' + (error.message || 'Unknown error'));
       }
     }
   };
@@ -293,7 +313,7 @@ export const Create: React.FC = () => {
         faqs: formData.faqs.filter(f => f.question && f.answer),
         primaryColor: formData.primaryColor,
         tone: formData.tone,
-        avatarUrl: formData.avatar ? URL.createObjectURL(formData.avatar) : undefined,
+        avatarUrl: formData.avatarUrl,
         subdomain: formData.subdomain,
         officeHours: formData.officeHours,
         knowledge: formData.knowledge,
@@ -351,6 +371,7 @@ export const Create: React.FC = () => {
     }
 
     updateDeploymentStep('deploy', { loading: true, error: undefined });
+    setShowManualTrigger(false);
     
     try {
       toast.loading('Deploying to Vercel...', { id: 'deploy' });
@@ -363,11 +384,66 @@ export const Create: React.FC = () => {
         updateDeploymentStep('deploy', { loading: false, completed: true });
         toast.success('🎉 Agent deployed successfully!', { id: 'deploy' });
       } else {
-        throw new Error(result.error || 'Vercel deployment failed');
+        // Show manual trigger option
+        setShowManualTrigger(true);
+        setVercelUrl(result.vercelUrl || null);
+        updateDeploymentStep('deploy', { loading: false, error: result.error });
+        toast.error('Deployment pending: ' + (result.error || 'Manual trigger may be needed'), { id: 'deploy' });
       }
     } catch (error: any) {
+      setShowManualTrigger(true);
       updateDeploymentStep('deploy', { loading: false, error: error.message });
       toast.error('Vercel deployment failed: ' + error.message, { id: 'deploy' });
+    }
+  };
+
+  // Manual trigger deployment
+  const handleManualTrigger = async () => {
+    if (!agentId) {
+      toast.error('Agent ID not found');
+      return;
+    }
+
+    setTriggerLoading(true);
+    
+    try {
+      toast.loading('Triggering deployment...', { id: 'trigger' });
+
+      const result = await triggerDeploymentWithFile(agentId);
+
+      if (result.success) {
+        toast.success('🚀 Deployment triggered! Please wait for it to complete...', { id: 'trigger' });
+        
+        // Wait a bit and then check for deployment
+        setTimeout(async () => {
+          try {
+            // Refresh agent data to get updated Vercel URL
+            const { data: agent } = await supabase
+              .from('agents')
+              .select('vercel_url')
+              .eq('id', agentId)
+              .single();
+
+            if (agent?.vercel_url && !agent.vercel_url.includes('dashboard')) {
+              setVercelUrl(agent.vercel_url);
+              setEmbedCode(`<!-- ${formData.brandName} AI Assistant - Generated by PLUDO.AI -->
+<script src="${agent.vercel_url}/float.js" defer></script>`);
+              updateDeploymentStep('deploy', { loading: false, completed: true, error: undefined });
+              setShowManualTrigger(false);
+              toast.success('🎉 Deployment completed successfully!');
+            }
+          } catch (error) {
+            console.error('Error checking deployment status:', error);
+          }
+        }, 30000); // Check after 30 seconds
+        
+      } else {
+        throw new Error(result.error || 'Failed to trigger deployment');
+      }
+    } catch (error: any) {
+      toast.error('Failed to trigger deployment: ' + error.message, { id: 'trigger' });
+    } finally {
+      setTriggerLoading(false);
     }
   };
 
@@ -380,6 +456,14 @@ export const Create: React.FC = () => {
 
     downloadAgentFiles(generatedFiles, formData.agentName);
     toast.success('Files downloaded successfully!');
+  };
+
+  // Copy embed code to clipboard
+  const copyEmbedCode = () => {
+    if (embedCode) {
+      navigator.clipboard.writeText(embedCode);
+      toast.success('Embed code copied to clipboard!');
+    }
   };
 
   const renderStepContent = () => {
@@ -871,36 +955,84 @@ export const Create: React.FC = () => {
                 ))}
               </div>
 
+              {/* Manual Trigger Section */}
+              {showManualTrigger && !deploymentSteps[2].completed && (
+                <div className="mt-6 p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+                  <div className="flex items-start space-x-3">
+                    <AlertCircle className="w-5 h-5 text-yellow-600 dark:text-yellow-400 mt-0.5" />
+                    <div className="flex-1">
+                      <h4 className="font-medium text-yellow-800 dark:text-yellow-200 mb-2">
+                        Deployment Needs Manual Trigger
+                      </h4>
+                      <p className="text-sm text-yellow-700 dark:text-yellow-300 mb-4">
+                        The automatic deployment didn't start. Click the button below to trigger it manually.
+                      </p>
+                      <Button
+                        onClick={handleManualTrigger}
+                        loading={triggerLoading}
+                        className="bg-yellow-600 hover:bg-yellow-700 text-white"
+                        size="sm"
+                      >
+                        <Zap className="w-4 h-4 mr-2" />
+                        Trigger Deployment
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Success State */}
-              {deploymentSteps.every(step => step.completed) && (
+              {deploymentSteps.every(step => step.completed) && embedCode && (
                 <div className="mt-6 p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
-                  <h4 className="font-medium text-green-800 dark:text-green-200 mb-2">
+                  <h4 className="font-medium text-green-800 dark:text-green-200 mb-4">
                     🎉 Your AI Agent is Live!
                   </h4>
-                  <div className="space-y-2 text-sm">
+                  
+                  <div className="space-y-4">
                     <div className="flex items-center justify-between">
-                      <span className="text-green-700 dark:text-green-300">Live URL:</span>
+                      <span className="text-sm text-green-700 dark:text-green-300">Live URL:</span>
                       <a 
                         href={vercelUrl!} 
                         target="_blank" 
                         rel="noopener noreferrer"
-                        className="text-primary-600 hover:text-primary-500 flex items-center"
+                        className="text-primary-600 hover:text-primary-500 flex items-center text-sm"
                       >
                         {vercelUrl} <ExternalLink className="w-3 h-3 ml-1" />
                       </a>
                     </div>
+                    
                     <div className="flex items-center justify-between">
-                      <span className="text-green-700 dark:text-green-300">GitHub Repo:</span>
+                      <span className="text-sm text-green-700 dark:text-green-300">GitHub Repo:</span>
                       <a 
                         href={githubRepo!} 
                         target="_blank" 
                         rel="noopener noreferrer"
-                        className="text-primary-600 hover:text-primary-500 flex items-center"
+                        className="text-primary-600 hover:text-primary-500 flex items-center text-sm"
                       >
                         View Code <ExternalLink className="w-3 h-3 ml-1" />
                       </a>
                     </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-green-700 dark:text-green-300 mb-2">
+                        Embed Code (Copy & Paste to Your Website):
+                      </label>
+                      <div className="relative">
+                        <pre className="bg-gray-100 dark:bg-gray-800 p-3 rounded text-xs font-mono overflow-x-auto text-gray-800 dark:text-gray-200">
+                          {embedCode}
+                        </pre>
+                        <Button
+                          onClick={copyEmbedCode}
+                          variant="outline"
+                          size="sm"
+                          className="absolute top-2 right-2"
+                        >
+                          <Copy className="w-3 h-3" />
+                        </Button>
+                      </div>
+                    </div>
                   </div>
+                  
                   <div className="mt-4">
                     <Button
                       onClick={() => navigate('/dashboard')}
