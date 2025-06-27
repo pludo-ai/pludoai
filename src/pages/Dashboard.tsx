@@ -6,21 +6,17 @@ import {
   Eye, 
   Code, 
   Brain, 
-  RotateCcw,
   LogOut,
   ExternalLink,
   Copy,
   Edit,
-  Trash2,
   Plus,
-  Download,
-  Github
+  Globe
 } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { useAuthStore } from '../store/authStore';
 import { supabase } from '../lib/supabase';
-import { regenerateAgent, downloadAgentFiles } from '../lib/deployment';
 import toast from 'react-hot-toast';
 
 interface Agent {
@@ -79,38 +75,6 @@ export const Dashboard: React.FC = () => {
     window.open(url, '_blank');
   };
 
-  const handleRegenerate = async (agentId: string) => {
-    try {
-      toast.loading('Regenerating agent...', { id: 'regen' });
-      const result = await regenerateAgent(agentId);
-      
-      if (result.success) {
-        toast.success('Agent regenerated successfully!', { id: 'regen' });
-        fetchAgents(); // Refresh the list
-      } else {
-        throw new Error(result.error);
-      }
-    } catch (error: any) {
-      toast.error('Failed to regenerate agent: ' + error.message, { id: 'regen' });
-    }
-  };
-
-  const handleDownloadAgent = async (agentId: string, agentName: string) => {
-    try {
-      toast.loading('Preparing download...', { id: 'download' });
-      const result = await regenerateAgent(agentId);
-      
-      if (result.success && result.files) {
-        downloadAgentFiles(result.files, agentName);
-        toast.success('Files downloaded successfully!', { id: 'download' });
-      } else {
-        throw new Error(result.error || 'Failed to get agent files');
-      }
-    } catch (error: any) {
-      toast.error('Failed to download agent: ' + error.message, { id: 'download' });
-    }
-  };
-
   const handleLogout = async () => {
     try {
       await supabase.auth.signOut();
@@ -156,7 +120,7 @@ export const Dashboard: React.FC = () => {
               </Card>
               <Card className="p-4">
                 <div className="text-2xl font-bold text-secondary-600 dark:text-secondary-400">
-                  {agents.filter(a => a.vercel_url).length}
+                  {agents.filter(a => a.vercel_url && !a.vercel_url.includes('dashboard')).length}
                 </div>
                 <div className="text-sm text-gray-600 dark:text-gray-300">
                   Deployed Agents
@@ -232,15 +196,15 @@ export const Dashboard: React.FC = () => {
                       <div className="flex items-center space-x-2">
                         <span className={`
                           px-2 py-1 text-xs font-medium rounded-full
-                          ${agent.vercel_url 
+                          ${agent.vercel_url && !agent.vercel_url.includes('dashboard')
                             ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
                             : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400'
                           }
                         `}>
-                          {agent.vercel_url ? 'deployed' : 'pending'}
+                          {agent.vercel_url && !agent.vercel_url.includes('dashboard') ? 'live' : 'pending'}
                         </span>
                         
-                        {agent.vercel_url && (
+                        {agent.vercel_url && !agent.vercel_url.includes('dashboard') && (
                           <Button
                             variant="outline"
                             size="sm"
@@ -252,36 +216,14 @@ export const Dashboard: React.FC = () => {
                           </Button>
                         )}
 
-                        {agent.github_repo && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => window.open(agent.github_repo!, '_blank')}
-                            className="flex items-center"
-                          >
-                            <Github className="w-4 h-4 mr-1" />
-                            Code
-                          </Button>
-                        )}
-
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => handleDownloadAgent(agent.id, agent.name)}
+                          onClick={() => window.location.href = '/create'}
                           className="flex items-center"
                         >
-                          <Download className="w-4 h-4 mr-1" />
-                          Download
-                        </Button>
-                        
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleRegenerate(agent.id)}
-                          className="flex items-center"
-                        >
-                          <RotateCcw className="w-4 h-4 mr-1" />
-                          Regenerate
+                          <Edit className="w-4 h-4 mr-1" />
+                          Edit
                         </Button>
                       </div>
                     </div>
@@ -340,7 +282,7 @@ export const Dashboard: React.FC = () => {
               Embed Your Agent
             </h3>
             <div className="space-y-6">
-              {agents.length > 0 && agents[0].vercel_url ? (
+              {agents.length > 0 && agents[0].vercel_url && !agents[0].vercel_url.includes('dashboard') ? (
                 <>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -348,12 +290,12 @@ export const Dashboard: React.FC = () => {
                     </label>
                     <div className="relative">
                       <pre className="bg-gray-100 dark:bg-gray-800 p-4 rounded-lg text-sm font-mono overflow-x-auto">
-                        {`<script src="${agents[0].vercel_url}/float.js"></script>`}
+                        {`<script src="${agents[0].vercel_url}/float.js" defer></script>`}
                       </pre>
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => copyToClipboard(`<script src="${agents[0].vercel_url}/float.js"></script>`)}
+                        onClick={() => copyToClipboard(`<script src="${agents[0].vercel_url}/float.js" defer></script>`)}
                         className="absolute top-2 right-2"
                       >
                         <Copy className="w-4 h-4" />
@@ -401,6 +343,7 @@ export const Dashboard: React.FC = () => {
                 </>
               ) : (
                 <div className="text-center py-8">
+                  <Globe className="w-12 h-12 text-gray-400 mx-auto mb-4" />
                   <p className="text-gray-500 mb-4">No deployed agents available for embedding</p>
                   <Button onClick={() => window.location.href = '/create'}>
                     Create Your First Agent

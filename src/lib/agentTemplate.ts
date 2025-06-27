@@ -272,6 +272,16 @@ ${config.knowledge || 'No additional information provided.'}`
     }
   ];
 
+  // Add avatar image file if provided
+  if (config.avatarUrl) {
+    files.push({
+      path: 'public/avatar.jpg',
+      content: `# Avatar image will be downloaded from: ${config.avatarUrl}
+# This file serves as a placeholder for the avatar image.
+# The actual image will be included in the repository during deployment.`
+    });
+  }
+
   return files;
 }
 
