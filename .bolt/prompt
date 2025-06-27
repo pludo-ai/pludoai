@@ -1,0 +1,71 @@
+For all designs I ask you to make, have them be beautiful, not cookie cutter. Make webpages that are fully featured and worthy for production.
+
+By default, this template supports JSX syntax with Tailwind CSS classes, React hooks, and Lucide React for icons. Do not install other packages for UI themes, icons, etc unless absolutely necessary or I request them.
+
+Use icons from lucide-react for logos.
+
+
+// MEMORY CONTEXT:
+// Pludo.AI is a no-code tool that lets any user — even with zero tech background — generate a fully personalized AI chatbot assistant that floats on their website. The user (called Puser) fills in basic details like brand name, services, agent tone, and color scheme. Then, Pludo handles everything:
+// - Stores user info in Supabase
+// - Pushes a private GitHub repo with agent template + their custom data
+// - Deploys it automatically to Vercel
+// - Returns a simple JS script to embed on any website
+
+// The chatbot is powered by OpenRouter AI (DeepSeek for live chat, Mistral for prompt tuning). A key feature is that users can update the bot's memory through a visual Memory Editor — this content is stored in their `knowledge.txt` file in GitHub and used as part of the AI's system prompt.
+
+// UI/UX is central: sleek, modern, interactive, not dev-looking. Designed to feel like Google or Linear's website — with real animations, spacing, responsiveness, and clarity. This is not just functional, it's visually engaging and frictionless.
+
+// THE GOAL: Create a fully automated system where someone fills a form, and walks away with a hosted, intelligent, branded chatbot.
+
+
+// -- UI DETAIL UPGRADE START --
+
+// === 🔥 UI STYLE GUIDE ===
+
+// 🌈 Landing Page:
+- Fullscreen responsive video background (auto-muted, looped)
+- Transparent navbar with logo on left, login/try button on right
+- Hero section with animated headline (typewriter effect) + CTA button
+- Cards with glassmorphism to display key features (hover = glow)
+- Timeline-style “How it Works” section with animated steps
+- Testimonial carousel: swipe or auto-scroll, floating avatars
+- Footer: dark, 3-column layout — social links, product, company info
+
+// ✨ Animations:
+- Use Framer Motion for fade-in scroll effects
+- Use Lottie JSON animations for loading buttons, agent deploy, confetti
+- On form inputs: subtle border glow when focused
+- Smooth modal & tab transitions (slide & scale in/out)
+
+// 📱 Responsiveness:
+- Mobile-first with collapsing nav + drawer menu
+- Dashboard switches to stacked layout on small viewports
+- Forms auto-expand on input focus, scale up for better accessibility
+
+// 🎨 Themes:
+- Dark mode toggle in top right (persist in localStorage)
+- Primary brand color used across accent borders, buttons, inputs
+
+// 🧰 Component Design:
+- Buttons: rounded-xl, 3D inset shadows, hover scale, glow
+- Input fields: rounded-lg, transparent bg, solid white text, drop shadow
+- Toast: top-right, dismissible, slide-in + timeout auto-hide
+
+// 📦 Pages should feel like:
+- Designed by a front-end pro, NOT like dev-only template
+- Balanced whitespace, padding (p-4 minimum), and alignment
+- Content block width should be max-w-5xl centered
+- Font choices: Inter / Poppins, medium weight + clean
+
+// 🎮 Additional UI Components:
+- Floating AI preview on homepage with trigger
+- Inline FAQ suggestion builder with buttons to add/delete
+- Slide-up confirmation drawers for deploy / preview
+- Embed code auto-selects when clicked
+
+// ✅ Brand Vibe:
+- Confident, premium, polished
+- Not childish, no comic fonts, no goofy icons
+- Minimal but not empty. Useful whitespace.
+- Inspires trust instantly like modern SaaS: Vercel, Linear, Notion

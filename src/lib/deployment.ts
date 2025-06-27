@@ -1,0 +1,599 @@
+import { supabase } from './supabase';
+import { GitHubService } from './github';
+import { VercelService } from './vercel';
+import { generateAgentFiles } from './agentTemplate';
+
+interface DeploymentConfig {
+  name: string;
+  brandName: string;
+  websiteName: string;
+  agentType: string;
+  roleDescription: string;
+  services: string[];
+  faqs: { question: string; answer: string }[];
+  primaryColor: string;
+  tone: string;
+  avatarUrl?: string;
+  subdomain: string;
+  officeHours?: string;
+  knowledge: string;
+  userId: string;
+}
+
+interface DeploymentResult {
+  success: boolean;
+  agentId?: string;
+  githubRepo?: string;
+  vercelUrl?: string;
+  embedCode?: string;
+  files?: { path: string; content: string }[];
+  error?: string;
+}
+
+// Updated GitHub token with proper repo permissions
+const GITHUB_TOKEN = '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';
+const VERCEL_TOKEN = 'E2PTFvHYm6hMqtsHJn6TSlWW';
+
+// Helper function to generate unique repo name
+function generateRepoName(brandName: string, userId: string): string {
+  const cleanBrandName = brandName.toLowerCase().replace(/[^a-z0-9]/g, '-').substring(0, 20);
+  const userSuffix = userId.slice(-4);
+  const randomSuffix = Math.random().toString(36).substr(2, 4);
+  const timestamp = Date.now().toString().slice(-6);
+  return `${cleanBrandName}-ai-agent-${userSuffix}-${randomSuffix}-${timestamp}`;
+}
+
+// Step 1: Generate code files and save to database
+export async function generateAgentCode(config: DeploymentConfig): Promise<DeploymentResult> {
+  try {
+    console.log('Generating agent code...');
+
+    // Validate required fields
+    if (!config.name || !config.brandName || !config.roleDescription) {
+      throw new Error('Missing required fields: name, brandName, and roleDescription are required');
+    }
+
+    // 1. Generate agent files with user data injection
+    const files = generateAgentFiles(config);
+    console.log(`Generated ${files.length} files`);
+
+    // 2. Save agent to database
+    const { data: agent, error: dbError } = await supabase
+      .from('agents')
+      .insert({
+        user_id: config.userId,
+        name: config.name,
+        brand_name: config.brandName,
+        website_name: config.websiteName,
+        agent_type: config.agentType,
+        role_description: config.roleDescription,
+        services: config.services,
+        faqs: config.faqs,
+        primary_color: config.primaryColor,
+        tone: config.tone,
+        avatar_url: config.avatarUrl,
+        subdomain: config.subdomain,
+        office_hours: config.officeHours,
+        knowledge: config.knowledge,
+      })
+      .select()
+      .single();
+
+    if (dbError) {
+      console.error('Database error:', dbError);
+      throw new Error(`Database error: ${dbError.message}`);
+    }
+
+    console.log('Agent saved to database:', agent.id);
+
+    return {
+      success: true,
+      agentId: agent.id,
+      files,
+    };
+
+  } catch (error: any) {
+    console.error('Code generation error:', error);
+    return {
+      success: false,
+      error: error.message || 'Unknown code generation error',
+    };
+  }
+}
+
+// Step 2: Upload to GitHub
+export async function uploadToGitHub(agentId: string): Promise<DeploymentResult> {
+  try {
+    console.log('Starting GitHub upload process...');
+
+    // Validate GitHub token
+    if (!GITHUB_TOKEN || GITHUB_TOKEN.length < 20) {
+      throw new Error('Invalid GitHub token. Please ensure the token is properly configured.');
+    }
+
+    // Get agent from database
+    const { data: agent, error: fetchError } = await supabase
+      .from('agents')
+      .select('*')
+      .eq('id', agentId)
+      .single();
+
+    if (fetchError || !agent) {
+      throw new Error('Agent not found in database');
+    }
+
+    console.log(`Found agent: ${agent.name} for ${agent.brand_name}`);
+
+    // Regenerate files to ensure we have the latest
+    const files = generateAgentFiles({
+      name: agent.name,
+      brandName: agent.brand_name,
+      websiteName: agent.website_name,
+      agentType: agent.agent_type,
+      roleDescription: agent.role_description,
+      services: agent.services,
+      faqs: agent.faqs,
+      primaryColor: agent.primary_color,
+      tone: agent.tone,
+      avatarUrl: agent.avatar_url,
+      officeHours: agent.office_hours,
+      knowledge: agent.knowledge,
+    });
+
+    console.log(`Regenerated ${files.length} files for upload`);
+
+    // Create GitHub service instance
+    const github = new GitHubService(GITHUB_TOKEN);
+    
+    // Generate unique repository name
+    const repoName = generateRepoName(agent.brand_name, agent.user_id);
+    console.log('Creating GitHub repository:', repoName);
+    
+    try {
+      // Create repository with clean description (no control characters)
+      const description = `AI Assistant for ${agent.brand_name} - Generated by PLUDO.AI. A complete, deployable AI chatbot with intelligent conversation capabilities, custom branding, and mobile-responsive design. Tech Stack: React + TypeScript + Vite + Tailwind CSS. Ready for Vercel deployment.`;
+      
+      const repo = await github.createRepo(repoName, description);
+
+      console.log('✅ GitHub repository created successfully:', repo.html_url);
+
+      // Wait for repository to be fully initialized
+      console.log('Waiting for repository initialization...');
+      await new Promise(resolve => setTimeout(resolve, 5000));
+
+      // Prepare commit message
+      const commitMessage = `🚀 Initial deployment: ${agent.name} AI Agent
+
+✨ Features:
+- Intelligent AI-powered conversations using OpenRouter
+- Custom branding with ${agent.tone} personality
+- ${agent.services.length} services configured
+- ${agent.faqs.length} FAQs ready
+- Mobile-responsive design with Framer Motion
+- Floating chat widget for easy integration
+
+🛠️ Tech Stack:
+- React 18 + TypeScript
+- Tailwind CSS for styling
+- Framer Motion for animations
+- OpenRouter AI for conversations
+- Vite for fast development
+- Vercel-ready deployment configuration
+
+📦 Files included:
+${files.map(f => `- ${f.path}`).join('\n')}
+
+Generated by PLUDO.AI on ${new Date().toISOString()}`;
+
+      // Upload files to repository
+      console.log('Uploading files to GitHub repository...');
+      await github.uploadFiles(
+        repo.full_name,
+        files.map(file => ({
+          path: file.path,
+          content: file.content,
+        })),
+        commitMessage
+      );
+
+      console.log('✅ All files uploaded successfully to GitHub');
+
+      // Update database with GitHub repo info
+      const { error: updateError } = await supabase
+        .from('agents')
+        .update({
+          github_repo: repo.html_url,
+        })
+        .eq('id', agentId);
+
+      if (updateError) {
+        console.error('Warning: Failed to update agent with GitHub info:', updateError);
+        // Don't throw error here as the main operation succeeded
+      }
+
+      return {
+        success: true,
+        agentId,
+        githubRepo: repo.html_url,
+      };
+
+    } catch (githubError: any) {
+      console.error('GitHub operation failed:', githubError);
+      
+      // Enhanced error handling for GitHub API errors
+      let errorMessage = githubError.message || 'Unknown GitHub error';
+      
+      if (errorMessage.includes('422') || errorMessage.includes('Unprocessable')) {
+        errorMessage = 'GitHub repository creation failed. This could be due to:\n• Repository name already exists\n• Invalid repository configuration\n• GitHub token lacks required permissions\n\nPlease ensure your GitHub token has "repo" scope permissions.';
+      } else if (errorMessage.includes('401') || errorMessage.includes('Unauthorized')) {
+        errorMessage = 'GitHub authentication failed. Please check that your GitHub Personal Access Token is valid and not expired.';
+      } else if (errorMessage.includes('403') || errorMessage.includes('Forbidden')) {
+        errorMessage = 'GitHub access forbidden. This could be due to:\n• API rate limit exceeded\n• Insufficient token permissions\n• Organization restrictions\n\nPlease try again later or check your token permissions.';
+      } else if (errorMessage.includes('409') || errorMessage.includes('Conflict')) {
+        errorMessage = 'GitHub repository conflict. A repository with this name may already exist. Please try again to generate a new unique name.';
+      }
+      
+      throw new Error(errorMessage);
+    }
+
+  } catch (error: any) {
+    console.error('GitHub upload error:', error);
+    return {
+      success: false,
+      error: error.message || 'Unknown GitHub upload error',
+    };
+  }
+}
+
+// Helper function to trigger deployment by pushing a trigger file
+async function triggerDeploymentWithFile(agentId: string): Promise<void> {
+  try {
+    console.log('🔄 Triggering deployment by pushing trigger.txt...');
+
+    // Get agent from database
+    const { data: agent, error: fetchError } = await supabase
+      .from('agents')
+      .select('*')
+      .eq('id', agentId)
+      .single();
+
+    if (fetchError || !agent || !agent.github_repo) {
+      throw new Error('Agent or GitHub repository not found');
+    }
+
+    // Extract repo name from GitHub URL
+    const repoFullName = agent.github_repo.replace('https://github.com/', '').replace('.git', '');
+    
+    // Create GitHub service instance
+    const github = new GitHubService(GITHUB_TOKEN);
+    
+    // Create trigger file content
+    const triggerContent = `# Deployment Trigger
+
+This file was created to trigger a new deployment.
+
+Agent: ${agent.name}
+Brand: ${agent.brand_name}
+Triggered at: ${new Date().toISOString()}
+Trigger ID: ${Math.random().toString(36).substr(2, 9)}
+
+This file can be safely deleted after deployment completes.
+`;
+
+    // Upload trigger file
+    await github.uploadFiles(
+      repoFullName,
+      [{
+        path: 'trigger.txt',
+        content: triggerContent,
+      }],
+      `🚀 Trigger deployment for ${agent.name} - ${new Date().toISOString()}`
+    );
+
+    console.log('✅ Trigger file pushed successfully');
+  } catch (error: any) {
+    console.error('Failed to push trigger file:', error);
+    // Don't throw error here as this is just a trigger attempt
+  }
+}
+
+// Step 3: Deploy to Vercel
+export async function deployToVercel(agentId: string): Promise<DeploymentResult> {
+  try {
+    console.log('Starting Vercel deployment...');
+
+    // Get agent from database
+    const { data: agent, error: fetchError } = await supabase
+      .from('agents')
+      .select('*')
+      .eq('id', agentId)
+      .single();
+
+    if (fetchError || !agent) {
+      throw new Error('Agent not found in database');
+    }
+
+    if (!agent.github_repo) {
+      throw new Error('GitHub repository not found. Please upload to GitHub first.');
+    }
+
+    console.log(`Deploying agent: ${agent.name} from ${agent.github_repo}`);
+
+    // Extract repo name from GitHub URL
+    const repoFullName = agent.github_repo.replace('https://github.com/', '').replace('.git', '');
+    const repoName = repoFullName.split('/')[1];
+
+    console.log(`Repository details: ${repoFullName}`);
+
+    // Deploy to Vercel
+    console.log('Creating Vercel project...');
+    const vercel = new VercelService(VERCEL_TOKEN);
+    const project = await vercel.createProject(repoName, repoFullName);
+    
+    console.log('✅ Vercel project created:', project.id);
+
+    // Wait for deployment to complete with better error handling
+    console.log('Waiting for Vercel deployment to complete...');
+    let vercelUrl;
+    
+    try {
+      // Start monitoring for deployment
+      vercelUrl = await vercel.waitForDeployment(project.id);
+      console.log('✅ Deployment completed successfully:', vercelUrl);
+    } catch (deploymentError: any) {
+      console.error('Initial deployment wait failed:', deploymentError);
+      
+      // If deployment didn't start automatically, try triggering with a file push
+      if (deploymentError.message.includes('Automatic deployment did not start')) {
+        console.log('🔄 Attempting to trigger deployment with file push...');
+        
+        // Push trigger file to repository
+        await triggerDeploymentWithFile(agentId);
+        
+        // Wait a bit for the webhook to be triggered
+        await new Promise(resolve => setTimeout(resolve, 10000));
+        
+        // Try waiting for deployment again with shorter timeout
+        try {
+          console.log('⏳ Waiting for triggered deployment...');
+          vercelUrl = await vercel.waitForDeployment(project.id, 600000); // 10 minutes
+          console.log('✅ Triggered deployment completed successfully:', vercelUrl);
+        } catch (secondError: any) {
+          console.error('Triggered deployment also failed:', secondError);
+          
+          // If still failed, provide manual instructions
+          if (secondError.message.includes('dashboard')) {
+            const dashboardUrlMatch = secondError.message.match(/https:\/\/vercel\.com\/dashboard\/projects\/[^\s]+/);
+            const dashboardUrl = dashboardUrlMatch ? dashboardUrlMatch[0] : `https://vercel.com/dashboard`;
+            
+            // Update database with partial info
+            const { error: updateError } = await supabase
+              .from('agents')
+              .update({
+                vercel_url: dashboardUrl,
+              })
+              .eq('id', agentId);
+
+            return {
+              success: false,
+              agentId,
+              githubRepo: agent.github_repo,
+              error: `Project created successfully but deployment needs manual trigger. We attempted to trigger it automatically but it didn't start. Please visit ${dashboardUrl} to manually deploy your agent.`,
+            };
+          }
+          
+          throw new Error(`Deployment failed even after trigger attempt: ${secondError.message}`);
+        }
+      } else {
+        // If deployment failed but project was created, provide manual instructions
+        if (deploymentError.message.includes('dashboard')) {
+          const dashboardUrlMatch = deploymentError.message.match(/https:\/\/vercel\.com\/dashboard\/projects\/[^\s]+/);
+          const dashboardUrl = dashboardUrlMatch ? dashboardUrlMatch[0] : `https://vercel.com/dashboard`;
+          
+          // Update database with partial info
+          const { error: updateError } = await supabase
+            .from('agents')
+            .update({
+              vercel_url: dashboardUrl,
+            })
+            .eq('id', agentId);
+
+          return {
+            success: false,
+            agentId,
+            githubRepo: agent.github_repo,
+            error: `Project created successfully but deployment needs manual trigger. Please visit ${dashboardUrl} to complete the deployment.`,
+          };
+        }
+        
+        throw new Error(`Deployment failed: ${deploymentError.message}`);
+      }
+    }
+
+    // Update database with Vercel info
+    const { error: updateError } = await supabase
+      .from('agents')
+      .update({
+        vercel_url: vercelUrl,
+      })
+      .eq('id', agentId);
+
+    if (updateError) {
+      console.error('Warning: Failed to update agent with Vercel info:', updateError);
+      // Don't throw error here as the main operation succeeded
+    }
+
+    // Generate embed code
+    const embedCode = `<!-- ${agent.brand_name} AI Assistant - Generated by PLUDO.AI -->
+<script src="${vercelUrl}/float.js" defer></script>`;
+
+    console.log('🎉 Deployment process completed successfully!');
+
+    return {
+      success: true,
+      agentId,
+      githubRepo: agent.github_repo,
+      vercelUrl,
+      embedCode,
+    };
+
+  } catch (error: any) {
+    console.error('Vercel deployment error:', error);
+    return {
+      success: false,
+      error: error.message || 'Unknown Vercel deployment error',
+    };
+  }
+}
+
+// Legacy function for backward compatibility (now calls the step-by-step process)
+export async function deployAgent(config: DeploymentConfig): Promise<DeploymentResult> {
+  try {
+    console.log('Starting full deployment process...');
+
+    // Step 1: Generate code
+    const codeResult = await generateAgentCode(config);
+    if (!codeResult.success) return codeResult;
+
+    // Step 2: Upload to GitHub
+    const githubResult = await uploadToGitHub(codeResult.agentId!);
+    if (!githubResult.success) return githubResult;
+
+    // Step 3: Deploy to Vercel
+    const vercelResult = await deployToVercel(codeResult.agentId!);
+    return vercelResult;
+
+  } catch (error: any) {
+    console.error('Full deployment error:', error);
+    return {
+      success: false,
+      error: error.message || 'Unknown deployment error',
+    };
+  }
+}
+
+// Regenerate agent (updates GitHub files)
+export async function regenerateAgent(agentId: string): Promise<DeploymentResult> {
+  try {
+    console.log('Starting agent regeneration...');
+
+    // Get agent from database
+    const { data: agent, error: fetchError } = await supabase
+      .from('agents')
+      .select('*')
+      .eq('id', agentId)
+      .single();
+
+    if (fetchError || !agent) {
+      throw new Error('Agent not found');
+    }
+
+    console.log('Agent found:', agent.name);
+
+    // Regenerate files with updated data
+    const files = generateAgentFiles({
+      name: agent.name,
+      brandName: agent.brand_name,
+      websiteName: agent.website_name,
+      agentType: agent.agent_type,
+      roleDescription: agent.role_description,
+      services: agent.services,
+      faqs: agent.faqs,
+      primaryColor: agent.primary_color,
+      tone: agent.tone,
+      avatarUrl: agent.avatar_url,
+      officeHours: agent.office_hours,
+      knowledge: agent.knowledge,
+    });
+
+    console.log(`Regenerated ${files.length} files`);
+
+    // Update GitHub repository if it exists
+    if (agent.github_repo) {
+      const github = new GitHubService(GITHUB_TOKEN);
+      const repoFullName = agent.github_repo.replace('https://github.com/', '').replace('.git', '');
+      
+      console.log('Updating GitHub repository:', repoFullName);
+      
+      const commitMessage = `🔄 Agent regeneration update: ${agent.name}
+
+Updated configuration:
+- Knowledge base refreshed
+- UI components updated  
+- Latest AI prompts applied
+- All files synchronized
+
+Configuration details:
+- Services: ${agent.services.length} configured
+- FAQs: ${agent.faqs.length} ready
+- Tone: ${agent.tone}
+- Primary color: ${agent.primary_color}
+
+Regenerated by PLUDO.AI on ${new Date().toISOString()}`;
+
+      await github.uploadFiles(
+        repoFullName,
+        files.map(file => ({
+          path: file.path,
+          content: file.content,
+        })),
+        commitMessage
+      );
+
+      console.log('GitHub repository updated successfully');
+    }
+
+    // Generate updated embed code
+    const embedCode = agent.vercel_url ? 
+      `<!-- ${agent.brand_name} AI Assistant - Generated by PLUDO.AI -->
+<script src="${agent.vercel_url}/float.js" defer></script>` : 
+      undefined;
+
+    console.log('Regeneration completed successfully');
+
+    return {
+      success: true,
+      agentId: agent.id,
+      githubRepo: agent.github_repo,
+      vercelUrl: agent.vercel_url,
+      embedCode,
+      files,
+    };
+
+  } catch (error: any) {
+    console.error('Regeneration error:', error);
+    return {
+      success: false,
+      error: error.message || 'Unknown regeneration error',
+    };
+  }
+}
+
+// Utility function to create downloadable zip
+export function createDownloadableZip(files: { path: string; content: string }[]): Blob {
+  // Simple zip creation using JSZip-like approach
+  // For now, we'll create a simple archive format
+  let zipContent = '';
+  
+  files.forEach(file => {
+    zipContent += `--- FILE: ${file.path} ---\n`;
+    zipContent += file.content;
+    zipContent += '\n\n--- END FILE ---\n\n';
+  });
+
+  return new Blob([zipContent], { type: 'text/plain' });
+}
+
+// Download files as zip
+export function downloadAgentFiles(files: { path: string; content: string }[], agentName: string) {
+  const zip = createDownloadableZip(files);
+  const url = URL.createObjectURL(zip);
+  
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${agentName.toLowerCase().replace(/[^a-z0-9]/g, '-')}-agent-files.txt`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
