@@ -18,7 +18,9 @@ import {
   Zap,
   Copy,
   AlertCircle,
-  Globe
+  Globe,
+  Terminal,
+  Play
 } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
@@ -40,6 +42,13 @@ interface DeploymentStep {
   error?: string;
 }
 
+interface TerminalLog {
+  id: string;
+  text: string;
+  type: 'info' | 'success' | 'error' | 'warning';
+  timestamp: Date;
+}
+
 export const Create: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuthStore();
@@ -53,6 +62,9 @@ export const Create: React.FC = () => {
   const [showManualTrigger, setShowManualTrigger] = useState(false);
   const [triggerLoading, setTriggerLoading] = useState(false);
   const [showScriptModal, setShowScriptModal] = useState(false);
+  const [showTerminal, setShowTerminal] = useState(false);
+  const [terminalLogs, setTerminalLogs] = useState<TerminalLog[]>([]);
+  const [deployStartTime, setDeployStartTime] = useState<Date | null>(null);
 
   const [deploymentSteps, setDeploymentSteps] = useState<DeploymentStep[]>([
     {
@@ -65,7 +77,7 @@ export const Create: React.FC = () => {
     },
     {
       id: 'github',
-      title: 'Upload to GitHub',
+      title: 'Upload to Cloud',
       description: 'Create private repository and push code',
       icon: <Github className="w-5 h-5" />,
       completed: false,
@@ -73,9 +85,17 @@ export const Create: React.FC = () => {
     },
     {
       id: 'deploy',
-      title: 'Deploy to Vercel',
+      title: 'Deploy to Server',
       description: 'Host your agent and make it live',
       icon: <Rocket className="w-5 h-5" />,
+      completed: false,
+      loading: false,
+    },
+    {
+      id: 'live',
+      title: 'Make it Live',
+      description: 'Trigger final deployment and get embed code',
+      icon: <Zap className="w-5 h-5" />,
       completed: false,
       loading: false,
     },
@@ -143,6 +163,20 @@ export const Create: React.FC = () => {
       icon: <Rocket className="w-6 h-6" />
     }
   ];
+
+  const addTerminalLog = (text: string, type: TerminalLog['type'] = 'info') => {
+    const newLog: TerminalLog = {
+      id: Date.now().toString(),
+      text,
+      type,
+      timestamp: new Date(),
+    };
+    setTerminalLogs(prev => [...prev, newLog]);
+  };
+
+  const clearTerminalLogs = () => {
+    setTerminalLogs([]);
+  };
 
   const updateDeploymentStep = (stepId: string, updates: Partial<DeploymentStep>) => {
     setDeploymentSteps(prev => prev.map(step => 
@@ -299,11 +333,14 @@ export const Create: React.FC = () => {
       generateSubdomain();
     }
 
+    setShowTerminal(true);
+    clearTerminalLogs();
     updateDeploymentStep('generate', { loading: true, error: undefined });
     
     try {
-      toast.loading('Generating your AI agent code...', { id: 'generate' });
-
+      addTerminalLog('🚀 Initializing agent generation...', 'info');
+      addTerminalLog('📝 Processing configuration data...', 'info');
+      
       const deploymentConfig = {
         name: formData.agentName,
         brandName: formData.brandName,
@@ -321,19 +358,24 @@ export const Create: React.FC = () => {
         userId: user.id,
       };
 
+      addTerminalLog('⚙️ Generating React components...', 'info');
+      addTerminalLog('🎨 Applying custom styling...', 'info');
+      addTerminalLog('🧠 Configuring AI prompts...', 'info');
+
       const result = await generateAgentCode(deploymentConfig);
 
       if (result.success) {
         setAgentId(result.agentId!);
         setGeneratedFiles(result.files!);
         updateDeploymentStep('generate', { loading: false, completed: true });
-        toast.success('🎉 Agent code generated successfully!', { id: 'generate' });
+        addTerminalLog(`✅ Generated ${result.files!.length} files successfully`, 'success');
+        addTerminalLog('📦 Agent package ready for deployment', 'success');
       } else {
         throw new Error(result.error || 'Code generation failed');
       }
     } catch (error: any) {
       updateDeploymentStep('generate', { loading: false, error: error.message });
-      toast.error('Code generation failed: ' + error.message, { id: 'generate' });
+      addTerminalLog(`❌ Generation failed: ${error.message}`, 'error');
     }
   };
 
@@ -347,35 +389,41 @@ export const Create: React.FC = () => {
     updateDeploymentStep('github', { loading: true, error: undefined });
     
     try {
-      toast.loading('Uploading to GitHub...', { id: 'github' });
+      addTerminalLog('☁️ Connecting to cloud repository...', 'info');
+      addTerminalLog('🔐 Authenticating with secure credentials...', 'info');
+      addTerminalLog('📁 Creating private repository...', 'info');
 
       const result = await uploadToGitHub(agentId);
 
       if (result.success) {
         setGithubRepo(result.githubRepo!);
         updateDeploymentStep('github', { loading: false, completed: true });
-        toast.success('🎉 Code uploaded to GitHub successfully!', { id: 'github' });
+        addTerminalLog('✅ Repository created successfully', 'success');
+        addTerminalLog('📤 All files uploaded to cloud', 'success');
+        addTerminalLog('🔒 Repository secured with private access', 'success');
       } else {
-        throw new Error(result.error || 'GitHub upload failed');
+        throw new Error(result.error || 'Cloud upload failed');
       }
     } catch (error: any) {
       updateDeploymentStep('github', { loading: false, error: error.message });
-      toast.error('GitHub upload failed: ' + error.message, { id: 'github' });
+      addTerminalLog(`❌ Upload failed: ${error.message}`, 'error');
     }
   };
 
   // Step 3: Deploy to Vercel
   const handleDeployToVercel = async () => {
     if (!agentId || !githubRepo) {
-      toast.error('Please upload to GitHub first');
+      toast.error('Please upload to cloud first');
       return;
     }
 
     updateDeploymentStep('deploy', { loading: true, error: undefined });
-    setShowManualTrigger(false);
+    setDeployStartTime(new Date());
     
     try {
-      toast.loading('Deploying to Vercel...', { id: 'deploy' });
+      addTerminalLog('🌐 Connecting to hosting server...', 'info');
+      addTerminalLog('⚡ Creating deployment project...', 'info');
+      addTerminalLog('🔗 Linking repository to server...', 'info');
 
       const result = await deployToVercel(agentId);
 
@@ -383,42 +431,52 @@ export const Create: React.FC = () => {
         setVercelUrl(result.vercelUrl!);
         setEmbedCode(result.embedCode!);
         updateDeploymentStep('deploy', { loading: false, completed: true });
-        toast.success('🎉 Agent deployed successfully!', { id: 'deploy' });
+        addTerminalLog('✅ Server deployment completed', 'success');
+        addTerminalLog(`🌍 Agent available at: ${result.vercelUrl}`, 'success');
       } else {
         // Show manual trigger option after a delay
         setTimeout(() => {
           setShowManualTrigger(true);
-        }, 5000); // Show trigger button after 5 seconds
+        }, 60000); // Show trigger button after 1 minute
         
         setVercelUrl(result.vercelUrl || null);
         updateDeploymentStep('deploy', { loading: false, error: result.error });
-        toast.error('Deployment pending: ' + (result.error || 'Manual trigger may be needed'), { id: 'deploy' });
+        addTerminalLog('⚠️ Automatic deployment pending...', 'warning');
+        addTerminalLog('🕐 Waiting for server initialization...', 'info');
+        addTerminalLog('💡 Manual trigger will be available in 1 minute', 'info');
       }
     } catch (error: any) {
       setTimeout(() => {
         setShowManualTrigger(true);
-      }, 5000);
+      }, 60000);
       updateDeploymentStep('deploy', { loading: false, error: error.message });
-      toast.error('Vercel deployment failed: ' + error.message, { id: 'deploy' });
+      addTerminalLog(`❌ Deployment error: ${error.message}`, 'error');
+      addTerminalLog('🔧 Manual intervention may be required', 'warning');
     }
   };
 
-  // Manual trigger deployment
-  const handleManualTrigger = async () => {
+  // Step 4: Make it Live (Manual trigger)
+  const handleMakeItLive = async () => {
     if (!agentId) {
       toast.error('Agent ID not found');
       return;
     }
 
+    updateDeploymentStep('live', { loading: true, error: undefined });
     setTriggerLoading(true);
     
     try {
-      toast.loading('Triggering deployment...', { id: 'trigger' });
+      addTerminalLog('🚀 Triggering final deployment...', 'info');
+      addTerminalLog('📝 Creating deployment trigger...', 'info');
+      addTerminalLog('⚡ Pushing activation signal...', 'info');
 
       const result = await triggerDeploymentWithFile(agentId);
 
       if (result.success) {
-        toast.success('🚀 Deployment triggered! Checking status...', { id: 'trigger' });
+        addTerminalLog('✅ Deployment trigger sent successfully', 'success');
+        addTerminalLog('🔄 Server processing activation...', 'info');
+        addTerminalLog('⏳ Finalizing deployment (30-60 seconds)...', 'info');
+        
         setShowManualTrigger(false);
         
         // Wait and check for deployment completion
@@ -435,15 +493,23 @@ export const Create: React.FC = () => {
               setVercelUrl(agent.vercel_url);
               setEmbedCode(`<!-- ${formData.brandName} AI Assistant - Generated by PLUDO.AI -->
 <script src="${agent.vercel_url}/float.js" defer></script>`);
+              updateDeploymentStep('live', { loading: false, completed: true });
               updateDeploymentStep('deploy', { loading: false, completed: true, error: undefined });
-              toast.success('🎉 Deployment completed successfully!');
+              addTerminalLog('🎉 Deployment completed successfully!', 'success');
+              addTerminalLog(`🌐 Your agent is now live at: ${agent.vercel_url}`, 'success');
+              addTerminalLog('📋 Embed code generated and ready to use', 'success');
+              setShowScriptModal(true);
             } else {
               // Still not ready, show the script modal anyway
+              updateDeploymentStep('live', { loading: false, completed: true });
+              addTerminalLog('⚠️ Deployment in progress, script ready', 'warning');
+              addTerminalLog('📋 You can get your embed code now', 'info');
               setShowScriptModal(true);
-              toast.success('🎉 Agent is being deployed! You can get your script now.');
             }
           } catch (error) {
             console.error('Error checking deployment status:', error);
+            updateDeploymentStep('live', { loading: false, completed: true });
+            addTerminalLog('⚠️ Status check failed, but trigger was sent', 'warning');
             setShowScriptModal(true);
           }
         }, 30000); // Check after 30 seconds
@@ -452,7 +518,8 @@ export const Create: React.FC = () => {
         throw new Error(result.error || 'Failed to trigger deployment');
       }
     } catch (error: any) {
-      toast.error('Failed to trigger deployment: ' + error.message, { id: 'trigger' });
+      updateDeploymentStep('live', { loading: false, error: error.message });
+      addTerminalLog(`❌ Trigger failed: ${error.message}`, 'error');
     } finally {
       setTriggerLoading(false);
     }
@@ -886,11 +953,6 @@ export const Create: React.FC = () => {
                         <p className="text-sm text-gray-500 dark:text-gray-400">
                           {step.description}
                         </p>
-                        {step.error && (
-                          <p className="text-sm text-red-600 dark:text-red-400 mt-1">
-                            Error: {step.error}
-                          </p>
-                        )}
                       </div>
                     </div>
 
@@ -927,29 +989,64 @@ export const Create: React.FC = () => {
                           Deploy
                         </Button>
                       )}
+
+                      {step.id === 'live' && (
+                        <Button
+                          onClick={handleMakeItLive}
+                          disabled={!deploymentSteps[2].completed || step.completed || step.loading || !showManualTrigger}
+                          loading={step.loading}
+                          size="sm"
+                          className="bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white"
+                        >
+                          <Zap className="w-4 h-4 mr-1" />
+                          Make it Live
+                        </Button>
+                      )}
                     </div>
                   </div>
                 ))}
               </div>
 
-              {/* Manual Trigger Section */}
-              {showManualTrigger && !deploymentSteps[2].completed && (
-                <div className="mt-6 p-4 bg-gradient-to-r from-primary-50 to-secondary-50 dark:from-primary-900/20 dark:to-secondary-900/20 border border-primary-200 dark:border-primary-800 rounded-lg">
-                  <div className="text-center">
-                    <h4 className="font-medium text-primary-800 dark:text-primary-200 mb-2">
-                      🚀 Ready to Launch Your Agent?
-                    </h4>
-                    <p className="text-sm text-primary-700 dark:text-primary-300 mb-4">
-                      Your agent is ready! Click below to get your embed script and make it live.
-                    </p>
-                    <Button
-                      onClick={handleGetYourAgent}
-                      className="bg-gradient-to-r from-primary-600 to-secondary-600 hover:from-primary-700 hover:to-secondary-700 text-white"
-                      size="lg"
-                    >
-                      <Globe className="w-5 h-5 mr-2" />
-                      Get Your Agent
-                    </Button>
+              {/* Terminal UI */}
+              {showTerminal && (
+                <div className="mt-6">
+                  <div className="bg-gray-900 rounded-lg overflow-hidden">
+                    <div className="flex items-center justify-between px-4 py-2 bg-gray-800">
+                      <div className="flex items-center space-x-2">
+                        <Terminal className="w-4 h-4 text-green-400" />
+                        <span className="text-sm text-gray-300 font-mono">Deployment Console</span>
+                      </div>
+                      <div className="flex space-x-2">
+                        <div className="w-3 h-3 bg-red-500 rounded-full"></div>
+                        <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
+                        <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                      </div>
+                    </div>
+                    <div className="p-4 h-64 overflow-y-auto font-mono text-sm">
+                      {terminalLogs.map((log) => (
+                        <motion.div
+                          key={log.id}
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          className={`mb-1 ${
+                            log.type === 'success' ? 'text-green-400' :
+                            log.type === 'error' ? 'text-red-400' :
+                            log.type === 'warning' ? 'text-yellow-400' :
+                            'text-gray-300'
+                          }`}
+                        >
+                          <span className="text-gray-500">
+                            [{log.timestamp.toLocaleTimeString()}]
+                          </span>{' '}
+                          {log.text}
+                        </motion.div>
+                      ))}
+                      {terminalLogs.length === 0 && (
+                        <div className="text-gray-500">
+                          Waiting for deployment to start...
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
               )}
@@ -1144,7 +1241,7 @@ export const Create: React.FC = () => {
               </div>
 
               <div className="space-y-6">
-                {vercelUrl && (
+                {vercelUrl && !vercelUrl.includes('dashboard') && (
                   <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                       Live Preview:
