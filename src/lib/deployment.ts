@@ -1,3 +1,8 @@
+import { supabase } from './supabase';
+import { GitHubService } from './github';
+import { VercelService } from './vercel';
+import { generateAgentFiles } from './agentTemplate';
+
 interface AgentConfig {
   name: string;
   brandName: string;
@@ -39,7 +44,7 @@ function generateRepoName(brandName: string, userId: string): string {
 }
 
 // Step 1: Generate code files and save to database
-export async function generateAgentCode(config: DeploymentConfig): Promise<DeploymentResult> {
+export async function generateAgentCode(config: AgentConfig): Promise<DeploymentResult> {
   try {
     console.log('Generating agent code...');
 
@@ -405,7 +410,7 @@ export async function deployToVercel(agentId: string): Promise<DeploymentResult>
 }
 
 // Legacy function for backward compatibility (now calls the step-by-step process)
-export async function deployAgent(config: DeploymentConfig): Promise<DeploymentResult> {
+export async function deployAgent(config: AgentConfig): Promise<DeploymentResult> {
   try {
     console.log('Starting full deployment process...');
 
