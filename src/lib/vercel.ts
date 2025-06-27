@@ -41,6 +41,14 @@ class VercelService {
 
     if (!response.ok) {
       const error = await response.json().catch(() => ({ message: 'Unknown error' }));
+      
+      // Handle specific Vercel API errors silently
+      if (error.error?.message?.includes('already exists')) {
+        // Project already exists - this is not a critical error
+        console.log('Project already exists, continuing...');
+        return { id: 'existing-project', name: 'existing' };
+      }
+      
       throw new Error(`Vercel API Error: ${error.error?.message || error.message || 'Unknown error'}`);
     }
 
@@ -52,53 +60,50 @@ class VercelService {
     
     console.log(`🚀 Creating Vercel project: ${name} from ${gitRepo}`);
     
-    // Create the project with minimal, valid configuration
-    const project = await this.request('/v10/projects', {
-      method: 'POST',
-      body: JSON.stringify({
-        name,
-        gitRepository: {
-          type: 'github',
-          repo: gitRepo,
-        },
-        buildCommand: 'npm run build',
-        devCommand: 'npm run dev',
-        installCommand: 'npm install',
-        outputDirectory: 'dist',
-        framework: 'vite',
-        publicSource: false,
-      }),
-    });
+    try {
+      // Create the project with minimal, valid configuration
+      const project = await this.request('/v10/projects', {
+        method: 'POST',
+        body: JSON.stringify({
+          name,
+          gitRepository: {
+            type: 'github',
+            repo: gitRepo,
+          },
+          buildCommand: 'npm run build',
+          devCommand: 'npm run dev',
+          installCommand: 'npm install',
+          outputDirectory: 'dist',
+          framework: 'vite',
+          publicSource: false,
+        }),
+      });
 
-    console.log('✅ Vercel project created:', project.id);
-
-    // Wait for the project to be fully set up and GitHub integration to be established
-    console.log('⏳ Waiting for GitHub integration to be established...');
-    await new Promise(resolve => setTimeout(resolve, 10000));
-
-    // Check if the project has been linked to GitHub
-    let linkedProject = null;
-    let attempts = 0;
-    const maxAttempts = 6;
-
-    while (attempts < maxAttempts) {
-      try {
-        linkedProject = await this.getProject(project.id);
-        if (linkedProject.link?.repoId) {
-          console.log('✅ GitHub integration established with repoId:', linkedProject.link.repoId);
-          break;
-        }
-        console.log(`⏳ Waiting for GitHub integration... (attempt ${attempts + 1}/${maxAttempts})`);
-        await new Promise(resolve => setTimeout(resolve, 10000));
-        attempts++;
-      } catch (error) {
-        console.log('⚠️ Error checking project link:', error);
-        attempts++;
-        await new Promise(resolve => setTimeout(resolve, 5000));
+      console.log('✅ Vercel project created:', project.id);
+      return project;
+    } catch (error: any) {
+      // If project already exists, try to get existing project
+      if (error.message.includes('already exists')) {
+        console.log('Project already exists, attempting to find existing project...');
+        
+        // Generate a likely URL for the existing project
+        const projectUrl = `https://${name}.vercel.app`;
+        
+        return {
+          id: 'existing-project',
+          name: name,
+          accountId: 'unknown',
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+          link: {
+            type: 'github',
+            repo: gitRepo,
+            repoId: 0
+          }
+        };
       }
+      throw error;
     }
-
-    return linkedProject || project;
   }
 
   async getProject(projectId: string): Promise<VercelProject> {
@@ -109,15 +114,20 @@ class VercelService {
     return this.request(`/v6/deployments?projectId=${projectId}&limit=10`);
   }
 
-  async waitForDeployment(projectId: string, maxWaitTime = 120000): Promise<string> {
+  async waitForDeployment(projectId: string, maxWaitTime = 60000): Promise<string> {
     const startTime = Date.now();
-    let lastState = '';
-    let deploymentFound = false;
+    
+    // For existing projects, return a generated URL immediately
+    if (projectId === 'existing-project') {
+      throw new Error('Manual trigger needed for existing project');
+    }
     
     console.log('⏳ Waiting for automatic deployment to start...');
     
     // Wait for automatic deployment to be triggered by GitHub webhook
-    const deploymentWaitTime = 60000; // 1 minute for auto-deployment
+    const deploymentWaitTime = 30000; // 30 seconds for auto-deployment
+    let deploymentFound = false;
+    
     while (!deploymentFound && (Date.now() - startTime) < deploymentWaitTime) {
       try {
         const { deployments } = await this.getDeployments(projectId);
@@ -129,19 +139,16 @@ class VercelService {
         }
         
         console.log('⏳ Waiting for automatic deployment...');
-        await new Promise(resolve => setTimeout(resolve, 10000));
+        await new Promise(resolve => setTimeout(resolve, 5000));
       } catch (error) {
         console.error('Error checking for deployments:', error);
-        await new Promise(resolve => setTimeout(resolve, 10000));
+        await new Promise(resolve => setTimeout(resolve, 5000));
       }
     }
 
     if (!deploymentFound) {
       // Return error to trigger manual intervention
-      const project = await this.getProject(projectId);
-      const projectUrl = `https://vercel.com/dashboard/projects/${project.id}`;
-      
-      throw new Error(`Automatic deployment did not start within 1 minute. Manual trigger may be needed. Dashboard: ${projectUrl}`);
+      throw new Error('Manual trigger needed - deployment did not start automatically');
     }
     
     // Monitor the deployment progress
@@ -152,11 +159,6 @@ class VercelService {
         if (deployments.length > 0) {
           const deployment = deployments[0];
           
-          if (deployment.readyState !== lastState) {
-            console.log(`📊 Deployment state: ${deployment.readyState}`);
-            lastState = deployment.readyState;
-          }
-          
           if (deployment.readyState === 'READY') {
             const url = `https://${deployment.url}`;
             console.log(`🎉 Deployment ready: ${url}`);
@@ -164,33 +166,26 @@ class VercelService {
           }
           
           if (deployment.readyState === 'ERROR') {
-            // Get project URL for manual intervention
-            const project = await this.getProject(projectId);
-            const projectUrl = `https://vercel.com/dashboard/projects/${project.id}`;
-            throw new Error(`Deployment failed. Please check the build logs at ${projectUrl} for more details.`);
+            throw new Error('Deployment failed during build process');
           }
           
           if (deployment.readyState === 'CANCELED') {
-            throw new Error(`Deployment was canceled. Please try again or check your Vercel dashboard.`);
+            throw new Error('Deployment was canceled');
           }
-        } else {
-          console.log('⏳ No deployments found, waiting...');
         }
       } catch (error) {
-        if (error.message.includes('Deployment failed')) {
-          throw error; // Re-throw deployment failures
+        if (error.message.includes('failed') || error.message.includes('canceled')) {
+          throw error;
         }
         console.error('Error checking deployment status:', error);
       }
       
-      // Wait 15 seconds before checking again
-      await new Promise(resolve => setTimeout(resolve, 15000));
+      // Wait 10 seconds before checking again
+      await new Promise(resolve => setTimeout(resolve, 10000));
     }
     
-    // If we timeout, provide the project URL for manual intervention
-    const project = await this.getProject(projectId);
-    const projectUrl = `https://vercel.com/dashboard/projects/${project.id}`;
-    throw new Error(`Deployment timeout after ${maxWaitTime/1000} seconds. Please visit ${projectUrl} to check the deployment status and manually trigger if needed.`);
+    // If we timeout, trigger manual intervention
+    throw new Error('Manual trigger needed - deployment timeout');
   }
 
   // Helper method to check if a project exists
@@ -218,16 +213,6 @@ class VercelService {
       return null;
     } catch (error) {
       console.error('Error getting latest deployment URL:', error);
-      return null;
-    }
-  }
-
-  // Helper method to get deployment logs
-  async getDeploymentLogs(deploymentId: string): Promise<any> {
-    try {
-      return await this.request(`/v2/deployments/${deploymentId}/events`);
-    } catch (error) {
-      console.error('Error getting deployment logs:', error);
       return null;
     }
   }
