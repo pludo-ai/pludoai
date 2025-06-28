@@ -158,9 +158,10 @@ class VercelService {
           }
           
           if (deployment.readyState === 'READY') {
-            const url = `https://${deployment.url}`;
-            console.log(`🎉 Deployment ready: ${url}`);
-            return url;
+            // Return the public hosted URL in the format requested
+            const publicUrl = `https://${deployment.url}`;
+            console.log(`🎉 Deployment ready: ${publicUrl}`);
+            return publicUrl;
           }
           
           if (deployment.readyState === 'ERROR') {
@@ -211,6 +212,7 @@ class VercelService {
       if (deployments.length > 0) {
         const latestDeployment = deployments[0];
         if (latestDeployment.readyState === 'READY') {
+          // Return public hosted URL format
           return `https://${latestDeployment.url}`;
         }
       }

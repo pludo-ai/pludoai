@@ -63,6 +63,12 @@ export default defineConfig({
       }
     }
   },
+  server: {
+    headers: {
+      'Cross-Origin-Embedder-Policy': 'unsafe-none',
+      'Cross-Origin-Resource-Policy': 'cross-origin'
+    }
+  }
 });`
     },
     {
@@ -273,6 +279,38 @@ ${config.knowledge || 'No additional information provided.'}`
         "outputDirectory": "dist",
         "installCommand": "npm install",
         "framework": "vite",
+        "headers": [
+          {
+            "source": "/widget.js",
+            "headers": [
+              {
+                "key": "Cross-Origin-Resource-Policy",
+                "value": "cross-origin"
+              },
+              {
+                "key": "Access-Control-Allow-Origin",
+                "value": "*"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/javascript"
+              }
+            ]
+          },
+          {
+            "source": "/widget.html",
+            "headers": [
+              {
+                "key": "Cross-Origin-Embedder-Policy",
+                "value": "unsafe-none"
+              },
+              {
+                "key": "Cross-Origin-Resource-Policy",
+                "value": "cross-origin"
+              }
+            ]
+          }
+        ],
         "rewrites": [
           {
             "source": "/widget.js",
@@ -292,6 +330,22 @@ ${config.knowledge || 'No additional information provided.'}`
           }
         ]
       }, null, 2)
+    },
+    {
+      path: '_headers',
+      content: `# Headers for Netlify deployment
+/widget.js
+  Cross-Origin-Resource-Policy: cross-origin
+  Access-Control-Allow-Origin: *
+  Content-Type: application/javascript
+
+/widget.html
+  Cross-Origin-Embedder-Policy: unsafe-none
+  Cross-Origin-Resource-Policy: cross-origin
+
+/*
+  X-Frame-Options: SAMEORIGIN
+  X-Content-Type-Options: nosniff`
     }
   ];
 
