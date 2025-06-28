@@ -9,7 +9,6 @@ interface AgentConfig {
   primaryColor: string;
   tone: string;
   avatarUrl?: string;
-  subdomain: string;
   officeHours?: string;
   knowledge: string;
 }
@@ -59,7 +58,7 @@ export default defineConfig({
     rollupOptions: {
       input: {
         main: 'index.html',
-        widget: 'widget.html'
+        float: 'float.html'
       }
     }
   },
@@ -69,7 +68,7 @@ export default defineConfig({
       path: 'tailwind.config.js',
       content: `/** @type {import('tailwindcss').Config} */
 export default {
-  content: ['./index.html', './widget.html', './src/**/*.{js,ts,jsx,tsx}'],
+  content: ['./index.html', './float.html', './src/**/*.{js,ts,jsx,tsx}'],
   darkMode: 'class',
   theme: {
     extend: {
@@ -131,45 +130,25 @@ export default {
 </html>`
     },
     {
-      path: 'widget.html',
+      path: 'float.html',
       content: `<!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>${config.name} - Floating Chat Widget</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
-      * {
-        margin: 0;
-        padding: 0;
-        box-sizing: border-box;
-      }
-      
       body { 
         margin: 0; 
         padding: 0; 
         font-family: 'Inter', system-ui, sans-serif;
         background: transparent;
-        overflow: hidden;
-      }
-      
-      #widget-root {
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100vw;
-        height: 100vh;
-        pointer-events: none;
-        z-index: 2147483647;
       }
     </style>
   </head>
   <body>
-    <div id="widget-root"></div>
-    <script type="module" src="/src/widget.tsx"></script>
+    <div id="float-root"></div>
+    <script type="module" src="/src/float.tsx"></script>
   </body>
 </html>`
     },
@@ -187,13 +166,13 @@ createRoot(document.getElementById('root')!).render(
 );`
     },
     {
-      path: 'src/widget.tsx',
+      path: 'src/float.tsx',
       content: `import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import FloatingWidget from './FloatingWidget.tsx';
 import './index.css';
 
-createRoot(document.getElementById('widget-root')!).render(
+createRoot(document.getElementById('float-root')!).render(
   <StrictMode>
     <FloatingWidget />
   </StrictMode>
@@ -275,29 +254,18 @@ ${config.knowledge || 'No additional information provided.'}`
         "outputDirectory": "dist",
         "installCommand": "npm install",
         "framework": "vite",
-        "headers": [
-          {
-            "source": "/float.js",
-            "headers": [
-              {
-                "key": "Access-Control-Allow-Origin",
-                "value": "*"
-              },
-              {
-                "key": "Access-Control-Allow-Methods",
-                "value": "GET, POST, PUT, DELETE, OPTIONS"
-              },
-              {
-                "key": "Access-Control-Allow-Headers",
-                "value": "Content-Type, Authorization"
-              }
-            ]
-          }
-        ],
         "rewrites": [
           {
+            "source": "/float.js",
+            "destination": "/float.js"
+          },
+          {
             "source": "/widget",
-            "destination": "/widget.html"
+            "destination": "/float.html"
+          },
+          {
+            "source": "/(.*)",
+            "destination": "/index.html"
           }
         ]
       }, null, 2)
@@ -464,14 +432,14 @@ function FloatingWidget() {
   const [isOpen, setIsOpen] = useState(false);
 
   return (
-    <>
+    <div className="fixed inset-0 pointer-events-none z-50">
       <FloatingButton onClick={() => setIsOpen(true)} />
       <ChatWidget 
         isOpen={isOpen} 
         onClose={() => setIsOpen(false)}
         config={${JSON.stringify(config)}}
       />
-    </>
+    </div>
   );
 }
 
@@ -573,7 +541,7 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({ isOpen, onClose, config 
 
   return (
     <AnimatePresence>
-      <div className="fixed bottom-4 right-4 pointer-events-auto z-50">
+      <div className="fixed inset-0 pointer-events-auto z-50 flex items-end justify-end p-4 md:items-center md:justify-center">
         <motion.div
           initial={{ scale: 0.9, opacity: 0, y: 20 }}
           animate={{ 
@@ -583,8 +551,8 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({ isOpen, onClose, config 
             height: isMinimized ? 'auto' : '600px'
           }}
           exit={{ scale: 0.9, opacity: 0, y: 20 }}
-          className="bg-white rounded-2xl shadow-2xl w-96 flex flex-col overflow-hidden border border-gray-200"
-          style={{ maxHeight: '90vh', maxWidth: 'calc(100vw - 2rem)' }}
+          className="bg-white rounded-2xl shadow-2xl w-full max-w-md flex flex-col overflow-hidden border border-gray-200"
+          style={{ maxHeight: '90vh' }}
         >
           {/* Header */}
           <div className="flex items-center justify-between p-4 border-b border-gray-100 bg-gradient-to-r from-primary-50 to-primary-100">
@@ -611,7 +579,7 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({ isOpen, onClose, config 
           {!isMinimized && (
             <>
               {/* Messages */}
-              <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50" style={{ height: '400px' }}>
+              <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50">
                 {messages.map((message) => (
                   <motion.div
                     key={message.id}
@@ -868,16 +836,11 @@ function generateFloatScript(config: AgentConfig): string {
   // Configuration
   const config = ${JSON.stringify(config)};
   
-  // Get the current script's source to determine the base URL
-  const currentScript = document.currentScript || document.querySelector('script[src*="float.js"]');
-  const scriptSrc = currentScript ? currentScript.src : '';
-  const baseUrl = scriptSrc.replace('/float.js', '');
-  
   // Create iframe for floating widget
   function createFloatingWidget() {
     const iframe = document.createElement('iframe');
     iframe.id = 'pludo-ai-widget';
-    iframe.src = baseUrl + '/widget';
+    iframe.src = window.location.origin + '/widget';
     iframe.style.cssText = \`
       position: fixed !important;
       bottom: 0 !important;
@@ -889,12 +852,6 @@ function generateFloatScript(config: AgentConfig): string {
       pointer-events: none !important;
       background: transparent !important;
     \`;
-
-    // Allow the iframe to be interactive
-    iframe.onload = function() {
-      iframe.style.pointerEvents = 'none';
-      // The widget itself will handle pointer events for its elements
-    };
 
     return iframe;
   }

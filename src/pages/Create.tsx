@@ -1,734 +1,1106 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { 
   Bot, 
-  Sparkles, 
-  Upload, 
-  Github, 
-  Globe, 
-  Check, 
-  AlertCircle,
-  Plus,
-  Minus,
-  Palette,
-  MessageSquare,
-  Settings,
-  Brain,
+  Palette, 
+  MessageSquare, 
+  Clock, 
+  Upload,
+  Sparkles,
+  ChevronLeft,
+  ChevronRight,
+  Save,
+  Rocket,
   Code,
+  Github,
+  CheckCircle,
   ExternalLink,
+  Zap,
   Copy,
-  Download
+  AlertCircle,
+  Globe,
+  Terminal,
+  Play
 } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Textarea } from '../components/ui/Textarea';
 import { Card } from '../components/ui/Card';
 import { useAuthStore } from '../store/authStore';
-import { generateAgentCode, uploadToGitHub, deployToVercel } from '../lib/deployment';
+import { generateAgentCode, uploadToGitHub, deployToVercel, triggerDeploymentWithFile } from '../lib/deployment';
+import { supabase } from '../lib/supabase';
 import toast from 'react-hot-toast';
-
-interface FAQ {
-  question: string;
-  answer: string;
-}
-
-interface FormData {
-  name: string;
-  brandName: string;
-  websiteName: string;
-  agentType: string;
-  roleDescription: string;
-  services: string[];
-  faqs: FAQ[];
-  primaryColor: string;
-  tone: string;
-  avatarUrl: string;
-  subdomain: string;
-  officeHours: string;
-  knowledge: string;
-}
+import { useNavigate } from 'react-router-dom';
 
 interface DeploymentStep {
   id: string;
   title: string;
   description: string;
-  status: 'pending' | 'loading' | 'completed' | 'error';
-  result?: any;
+  icon: React.ReactNode;
+  completed: boolean;
+  loading: boolean;
+  error?: string;
+}
+
+interface TerminalLog {
+  id: string;
+  text: string;
+  type: 'info' | 'success' | 'error' | 'warning';
+  timestamp: Date;
 }
 
 export const Create: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuthStore();
-  const [currentStep, setCurrentStep] = useState(1);
+  const [currentStep, setCurrentStep] = useState(0);
   const [loading, setLoading] = useState(false);
-  const [deploymentSteps, setDeploymentSteps] = useState<DeploymentStep[]>([]);
   const [agentId, setAgentId] = useState<string | null>(null);
-  const [embedCode, setEmbedCode] = useState<string>('');
-  const [previewUrl, setPreviewUrl] = useState<string>('');
+  const [generatedFiles, setGeneratedFiles] = useState<{ path: string; content: string }[] | null>(null);
+  const [githubRepo, setGithubRepo] = useState<string | null>(null);
+  const [vercelUrl, setVercelUrl] = useState<string | null>(null);
+  const [embedCode, setEmbedCode] = useState<string | null>(null);
+  const [showManualTrigger, setShowManualTrigger] = useState(false);
+  const [triggerLoading, setTriggerLoading] = useState(false);
+  const [showScriptModal, setShowScriptModal] = useState(false);
+  const [showTerminal, setShowTerminal] = useState(false);
+  const [terminalLogs, setTerminalLogs] = useState<TerminalLog[]>([]);
+  const [deployStartTime, setDeployStartTime] = useState<Date | null>(null);
 
-  const [formData, setFormData] = useState<FormData>({
+  const [deploymentSteps, setDeploymentSteps] = useState<DeploymentStep[]>([
+    {
+      id: 'generate',
+      title: 'Generate Code',
+      description: 'Create AI agent files with your configuration',
+      icon: <Code className="w-5 h-5" />,
+      completed: false,
+      loading: false,
+    },
+    {
+      id: 'github',
+      title: 'Upload to Cloud',
+      description: 'Create private repository and push code',
+      icon: <Github className="w-5 h-5" />,
+      completed: false,
+      loading: false,
+    },
+    {
+      id: 'deploy',
+      title: 'Deploy to Server',
+      description: 'Host your agent and make it live',
+      icon: <Rocket className="w-5 h-5" />,
+      completed: false,
+      loading: false,
+    },
+    {
+      id: 'live',
+      title: 'Make it Live',
+      description: 'Trigger final deployment and get embed code',
+      icon: <Zap className="w-5 h-5" />,
+      completed: false,
+      loading: false,
+    },
+  ]);
+
+  const [formData, setFormData] = useState({
+    // Basic Info
     name: '',
     brandName: '',
     websiteName: '',
+    agentName: '',
     agentType: 'customer-support',
     roleDescription: '',
+    
+    // Services & Knowledge
     services: [''],
     faqs: [{ question: '', answer: '' }],
+    knowledge: '',
+    
+    // Customization
     primaryColor: '#3b82f6',
     tone: 'professional',
+    avatar: null as File | null,
     avatarUrl: '',
+    
+    // Settings
     subdomain: '',
     officeHours: '',
-    knowledge: '',
   });
 
-  // Generate unique keys for dynamic elements
-  const [serviceKeys, setServiceKeys] = useState<string[]>(['service-0']);
-  const [faqKeys, setFaqKeys] = useState<string[]>(['faq-0']);
+  const agentTypes = [
+    { id: 'portfolio', label: 'Portfolio Assistant', description: 'Showcase your work and skills' },
+    { id: 'customer-support', label: 'Customer Support Bot', description: 'Help customers with common questions' },
+    { id: 'lead-generator', label: 'Lead Generator', description: 'Capture and qualify potential customers' },
+    { id: 'appointment', label: 'Appointment Assistant', description: 'Schedule meetings and bookings' },
+    { id: 'custom', label: 'Custom Q&A Agent', description: 'General purpose question answering' },
+  ];
 
-  useEffect(() => {
-    if (!user) {
-      navigate('/login');
+  const tones = [
+    { id: 'friendly', label: 'Friendly', description: 'Warm and approachable' },
+    { id: 'professional', label: 'Professional', description: 'Business-focused and formal' },
+    { id: 'witty', label: 'Witty', description: 'Fun and engaging' },
+    { id: 'minimal', label: 'Minimal', description: 'Concise and direct' },
+  ];
+
+  const steps = [
+    {
+      title: 'Basic Information',
+      description: 'Tell us about your business and agent',
+      icon: <Bot className="w-6 h-6" />
+    },
+    {
+      title: 'Services & Knowledge',
+      description: 'Define what your agent knows',
+      icon: <MessageSquare className="w-6 h-6" />
+    },
+    {
+      title: 'Customization',
+      description: 'Make your agent unique',
+      icon: <Palette className="w-6 h-6" />
+    },
+    {
+      title: 'Deploy Your Agent',
+      description: 'Generate, upload, and host your agent',
+      icon: <Rocket className="w-6 h-6" />
     }
-  }, [user, navigate]);
+  ];
 
-  useEffect(() => {
-    // Generate subdomain from brand name
-    if (formData.brandName) {
-      const subdomain = formData.brandName
-        .toLowerCase()
-        .replace(/[^a-z0-9]/g, '-')
-        .replace(/-+/g, '-')
-        .replace(/^-|-$/g, '')
-        .substring(0, 20);
-      setFormData(prev => ({ ...prev, subdomain }));
-    }
-  }, [formData.brandName]);
-
-  const handleInputChange = (field: keyof FormData, value: any) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+  const addTerminalLog = (text: string, type: TerminalLog['type'] = 'info') => {
+    const newLog: TerminalLog = {
+      id: Date.now().toString(),
+      text,
+      type,
+      timestamp: new Date(),
+    };
+    setTerminalLogs(prev => [...prev, newLog]);
   };
 
-  const addService = () => {
-    const newKey = `service-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-    setFormData(prev => ({ ...prev, services: [...prev.services, ''] }));
-    setServiceKeys(prev => [...prev, newKey]);
+  const clearTerminalLogs = () => {
+    setTerminalLogs([]);
   };
 
-  const removeService = (index: number) => {
-    setFormData(prev => ({
-      ...prev,
-      services: prev.services.filter((_, i) => i !== index)
-    }));
-    setServiceKeys(prev => prev.filter((_, i) => i !== index));
-  };
-
-  const updateService = (index: number, value: string) => {
-    setFormData(prev => ({
-      ...prev,
-      services: prev.services.map((service, i) => i === index ? value : service)
-    }));
-  };
-
-  const addFAQ = () => {
-    const newKey = `faq-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-    setFormData(prev => ({
-      ...prev,
-      faqs: [...prev.faqs, { question: '', answer: '' }]
-    }));
-    setFaqKeys(prev => [...prev, newKey]);
-  };
-
-  const removeFAQ = (index: number) => {
-    setFormData(prev => ({
-      ...prev,
-      faqs: prev.faqs.filter((_, i) => i !== index)
-    }));
-    setFaqKeys(prev => prev.filter((_, i) => i !== index));
-  };
-
-  const updateFAQ = (index: number, field: 'question' | 'answer', value: string) => {
-    setFormData(prev => ({
-      ...prev,
-      faqs: prev.faqs.map((faq, i) => 
-        i === index ? { ...faq, [field]: value } : faq
-      )
-    }));
-  };
-
-  const validateForm = (): boolean => {
-    if (!formData.name.trim()) {
-      toast.error('Agent name is required');
-      return false;
-    }
-    if (!formData.brandName.trim()) {
-      toast.error('Brand name is required');
-      return false;
-    }
-    if (!formData.roleDescription.trim()) {
-      toast.error('Role description is required');
-      return false;
-    }
-    if (formData.services.filter(s => s.trim()).length === 0) {
-      toast.error('At least one service is required');
-      return false;
-    }
-    return true;
-  };
-
-  const initializeDeploymentSteps = () => {
-    const steps: DeploymentStep[] = [
-      {
-        id: 'generate',
-        title: 'Generate Agent Code',
-        description: 'Creating your AI agent files and configuration',
-        status: 'pending'
-      },
-      {
-        id: 'github',
-        title: 'Upload to GitHub',
-        description: 'Creating private repository and uploading files',
-        status: 'pending'
-      },
-      {
-        id: 'deploy',
-        title: 'Deploy to Vercel',
-        description: 'Building and deploying your agent to the web',
-        status: 'pending'
-      }
-    ];
-    setDeploymentSteps(steps);
-  };
-
-  const updateStepStatus = (stepId: string, status: DeploymentStep['status'], result?: any) => {
+  const updateDeploymentStep = (stepId: string, updates: Partial<DeploymentStep>) => {
     setDeploymentSteps(prev => prev.map(step => 
-      step.id === stepId ? { ...step, status, result } : step
+      step.id === stepId ? { ...step, ...updates } : step
     ));
   };
 
-  const handleGenerateAgent = async () => {
-    if (!validateForm()) return;
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleServiceChange = (index: number, value: string) => {
+    const newServices = [...formData.services];
+    newServices[index] = value;
+    setFormData(prev => ({ ...prev, services: newServices }));
+  };
+
+  const addService = () => {
+    setFormData(prev => ({ ...prev, services: [...prev.services, ''] }));
+  };
+
+  const removeService = (index: number) => {
+    if (formData.services.length > 1) {
+      const newServices = formData.services.filter((_, i) => i !== index);
+      setFormData(prev => ({ ...prev, services: newServices }));
+    }
+  };
+
+  const handleFAQChange = (index: number, field: 'question' | 'answer', value: string) => {
+    const newFAQs = [...formData.faqs];
+    newFAQs[index][field] = value;
+    setFormData(prev => ({ ...prev, faqs: newFAQs }));
+  };
+
+  const addFAQ = () => {
+    setFormData(prev => ({ 
+      ...prev, 
+      faqs: [...prev.faqs, { question: '', answer: '' }] 
+    }));
+  };
+
+  const removeFAQ = (index: number) => {
+    if (formData.faqs.length > 1) {
+      const newFAQs = formData.faqs.filter((_, i) => i !== index);
+      setFormData(prev => ({ ...prev, faqs: newFAQs }));
+    }
+  };
+
+  const generateSubdomain = () => {
+    const subdomain = formData.brandName
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, '-')
+      .replace(/-+/g, '-')
+      .trim('-') + '-' + Math.random().toString(36).substr(2, 4);
+    setFormData(prev => ({ ...prev, subdomain }));
+  };
+
+  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 1024 * 1024) { // 1MB limit
+        toast.error('Avatar must be less than 1MB');
+        return;
+      }
+
+      try {
+        // Create a unique filename
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${user?.id}-${Date.now()}.${fileExt}`;
+        
+        // Upload to Supabase Storage
+        const { data, error } = await supabase.storage
+          .from('avatars')
+          .upload(fileName, file, {
+            cacheControl: '3600',
+            upsert: false
+          });
+
+        if (error) {
+          console.error('Storage upload error:', error);
+          throw error;
+        }
+
+        // Get public URL
+        const { data: { publicUrl } } = supabase.storage
+          .from('avatars')
+          .getPublicUrl(fileName);
+
+        setFormData(prev => ({ 
+          ...prev, 
+          avatar: file,
+          avatarUrl: publicUrl
+        }));
+        
+        toast.success('Avatar uploaded successfully!');
+      } catch (error: any) {
+        console.error('Avatar upload error:', error);
+        toast.error('Failed to upload avatar: ' + (error.message || 'Unknown error'));
+      }
+    }
+  };
+
+  const suggestFAQs = async () => {
+    const suggestedFAQs = [
+      { question: 'What are your business hours?', answer: formData.officeHours || 'Please contact us for our current business hours.' },
+      { question: 'How can I contact support?', answer: 'You can reach our support team through this chat or visit our website.' },
+      { question: 'What services do you offer?', answer: formData.services.filter(s => s).join(', ') || 'Please ask about our specific services.' },
+      { question: 'Do you offer refunds?', answer: 'Please contact us directly to discuss our refund policy.' },
+      { question: 'How long does delivery take?', answer: 'Delivery times vary depending on the service. Please contact us for specific timelines.' },
+    ];
+    
+    setFormData(prev => ({ ...prev, faqs: suggestedFAQs }));
+    toast.success('FAQ suggestions added!');
+  };
+
+  const rewriteDescription = async (style: 'fun' | 'professional' | 'casual') => {
+    const styles = {
+      fun: 'A super friendly and enthusiastic AI assistant that loves helping customers! 🎉',
+      professional: 'A dedicated AI assistant committed to providing exceptional customer service and support.',
+      casual: 'Your helpful AI buddy that\'s here to answer questions and make your day easier.'
+    };
+    
+    setFormData(prev => ({ ...prev, roleDescription: styles[style] }));
+    toast.success(`Description rewritten in ${style} style!`);
+  };
+
+  const nextStep = () => {
+    if (currentStep < steps.length - 1) {
+      setCurrentStep(currentStep + 1);
+    }
+  };
+
+  const prevStep = () => {
+    if (currentStep > 0) {
+      setCurrentStep(currentStep - 1);
+    }
+  };
+
+  // Step 1: Generate Code
+  const handleGenerateCode = async () => {
     if (!user) {
-      toast.error('Please log in to continue');
+      toast.error('Please log in to generate your agent');
       return;
     }
 
-    setLoading(true);
-    setCurrentStep(2);
-    initializeDeploymentSteps();
+    // Validate required fields
+    if (!formData.agentName || !formData.brandName || !formData.roleDescription) {
+      toast.error('Please fill in all required fields');
+      return;
+    }
 
+    if (!formData.subdomain) {
+      generateSubdomain();
+    }
+
+    setShowTerminal(true);
+    clearTerminalLogs();
+    updateDeploymentStep('generate', { loading: true, error: undefined });
+    
     try {
-      // Step 1: Generate Agent Code
-      updateStepStatus('generate', 'loading');
+      addTerminalLog('🚀 Initializing agent generation...', 'info');
+      addTerminalLog('📝 Processing configuration data...', 'info');
       
-      const config = {
-        ...formData,
+      const deploymentConfig = {
+        name: formData.agentName,
+        brandName: formData.brandName,
+        websiteName: formData.websiteName,
+        agentType: formData.agentType,
+        roleDescription: formData.roleDescription,
         services: formData.services.filter(s => s.trim()),
-        faqs: formData.faqs.filter(faq => faq.question.trim() && faq.answer.trim()),
+        faqs: formData.faqs.filter(f => f.question && f.answer),
+        primaryColor: formData.primaryColor,
+        tone: formData.tone,
+        avatarUrl: formData.avatarUrl,
+        subdomain: formData.subdomain,
+        officeHours: formData.officeHours,
+        knowledge: formData.knowledge,
         userId: user.id,
       };
 
-      const codeResult = await generateAgentCode(config);
-      
-      if (!codeResult.success) {
-        updateStepStatus('generate', 'error');
-        throw new Error(codeResult.error || 'Failed to generate agent code');
+      addTerminalLog('⚙️ Generating React components...', 'info');
+      addTerminalLog('🎨 Applying custom styling...', 'info');
+      addTerminalLog('🧠 Configuring AI prompts...', 'info');
+
+      const result = await generateAgentCode(deploymentConfig);
+
+      if (result.success) {
+        setAgentId(result.agentId!);
+        setGeneratedFiles(result.files!);
+        updateDeploymentStep('generate', { loading: false, completed: true });
+        addTerminalLog(`✅ Generated ${result.files!.length} files successfully`, 'success');
+        addTerminalLog('📦 Agent package ready for deployment', 'success');
+      } else {
+        throw new Error(result.error || 'Code generation failed');
       }
-
-      updateStepStatus('generate', 'completed', codeResult);
-      setAgentId(codeResult.agentId!);
-
-      // Step 2: Upload to GitHub
-      await handleUploadToGitHub(codeResult.agentId!);
-
     } catch (error: any) {
-      console.error('Agent generation error:', error);
-      toast.error(error.message || 'Failed to generate agent');
-      setLoading(false);
+      updateDeploymentStep('generate', { loading: false, error: error.message });
+      addTerminalLog(`❌ Generation failed: ${error.message}`, 'error');
     }
   };
 
-  const handleUploadToGitHub = async (agentId: string) => {
+  // Step 2: Upload to GitHub
+  const handleUploadToGitHub = async () => {
+    if (!agentId) {
+      toast.error('Please generate code first');
+      return;
+    }
+
+    updateDeploymentStep('github', { loading: true, error: undefined });
+    
     try {
-      updateStepStatus('github', 'loading');
-      
-      const githubResult = await uploadToGitHub(agentId);
-      
-      if (!githubResult.success) {
-        updateStepStatus('github', 'error');
-        throw new Error(githubResult.error || 'Failed to upload to GitHub');
+      addTerminalLog('☁️ Connecting to cloud repository...', 'info');
+      addTerminalLog('🔐 Authenticating with secure credentials...', 'info');
+      addTerminalLog('📁 Creating private repository...', 'info');
+
+      const result = await uploadToGitHub(agentId);
+
+      if (result.success) {
+        setGithubRepo(result.githubRepo!);
+        updateDeploymentStep('github', { loading: false, completed: true });
+        addTerminalLog('✅ Repository created successfully', 'success');
+        addTerminalLog('📤 All files uploaded to cloud', 'success');
+        addTerminalLog('🔒 Repository secured with private access', 'success');
+      } else {
+        throw new Error(result.error || 'Cloud upload failed');
       }
-
-      updateStepStatus('github', 'completed', githubResult);
-
-      // Step 3: Deploy to Vercel
-      await handleDeployToVercel(agentId);
-
     } catch (error: any) {
-      console.error('GitHub upload error:', error);
-      toast.error(error.message || 'Failed to upload to GitHub');
-      setLoading(false);
+      updateDeploymentStep('github', { loading: false, error: error.message });
+      addTerminalLog(`❌ Upload failed: ${error.message}`, 'error');
     }
   };
 
-  const handleDeployToVercel = async (agentId: string) => {
+  // Step 3: Deploy to Vercel
+  const handleDeployToVercel = async () => {
+    if (!agentId || !githubRepo) {
+      toast.error('Please upload to cloud first');
+      return;
+    }
+
+    updateDeploymentStep('deploy', { loading: true, error: undefined });
+    setDeployStartTime(new Date());
+    
     try {
-      updateStepStatus('deploy', 'loading');
-      
-      const deployResult = await deployToVercel(agentId);
-      
-      if (!deployResult.success) {
-        updateStepStatus('deploy', 'error');
-        throw new Error(deployResult.error || 'Failed to deploy to Vercel');
-      }
+      addTerminalLog('🌐 Connecting to hosting server...', 'info');
+      addTerminalLog('⚡ Creating deployment project...', 'info');
+      addTerminalLog('🔗 Linking repository to server...', 'info');
 
-      updateStepStatus('deploy', 'completed', deployResult);
-      
-      if (deployResult.vercelUrl) {
-        setPreviewUrl(deployResult.vercelUrl);
-      }
-      
-      if (deployResult.embedCode) {
-        setEmbedCode(deployResult.embedCode);
-      }
+      const result = await deployToVercel(agentId);
 
-      setCurrentStep(3);
-      toast.success('🎉 Agent deployed successfully!');
-
+      if (result.success) {
+        setVercelUrl(result.vercelUrl!);
+        setEmbedCode(result.embedCode!);
+        updateDeploymentStep('deploy', { loading: false, completed: true });
+        addTerminalLog('✅ Server deployment completed', 'success');
+        addTerminalLog(`🌍 Agent available at: ${result.vercelUrl}`, 'success');
+      } else {
+        // Show manual trigger option after a delay
+        setTimeout(() => {
+          setShowManualTrigger(true);
+        }, 60000); // Show trigger button after 1 minute
+        
+        setVercelUrl(result.vercelUrl || null);
+        updateDeploymentStep('deploy', { loading: false, error: result.error });
+        addTerminalLog('⚠️ Automatic deployment pending...', 'warning');
+        addTerminalLog('🕐 Waiting for server initialization...', 'info');
+        addTerminalLog('💡 Manual trigger will be available in 1 minute', 'info');
+      }
     } catch (error: any) {
-      console.error('Vercel deployment error:', error);
-      toast.error(error.message || 'Failed to deploy to Vercel');
+      setTimeout(() => {
+        setShowManualTrigger(true);
+      }, 60000);
+      updateDeploymentStep('deploy', { loading: false, error: error.message });
+      addTerminalLog(`❌ Deployment error: ${error.message}`, 'error');
+      addTerminalLog('🔧 Manual intervention may be required', 'warning');
+    }
+  };
+
+  // Step 4: Make it Live (Manual trigger)
+  const handleMakeItLive = async () => {
+    if (!agentId) {
+      toast.error('Agent ID not found');
+      return;
+    }
+
+    updateDeploymentStep('live', { loading: true, error: undefined });
+    setTriggerLoading(true);
+    
+    try {
+      addTerminalLog('🚀 Triggering final deployment...', 'info');
+      addTerminalLog('📝 Creating deployment trigger...', 'info');
+      addTerminalLog('⚡ Pushing activation signal...', 'info');
+
+      const result = await triggerDeploymentWithFile(agentId);
+
+      if (result.success) {
+        addTerminalLog('✅ Deployment trigger sent successfully', 'success');
+        addTerminalLog('🔄 Server processing activation...', 'info');
+        addTerminalLog('⏳ Finalizing deployment (30-60 seconds)...', 'info');
+        
+        setShowManualTrigger(false);
+        
+        // Wait and check for deployment completion
+        setTimeout(async () => {
+          try {
+            // Refresh agent data to get updated Vercel URL
+            const { data: agent } = await supabase
+              .from('agents')
+              .select('vercel_url')
+              .eq('id', agentId)
+              .single();
+
+            if (agent?.vercel_url && !agent.vercel_url.includes('dashboard')) {
+              setVercelUrl(agent.vercel_url);
+              setEmbedCode(`<!-- ${formData.brandName} AI Assistant - Generated by PLUDO.AI -->
+<script src="${agent.vercel_url}/float.js" defer></script>`);
+              updateDeploymentStep('live', { loading: false, completed: true });
+              updateDeploymentStep('deploy', { loading: false, completed: true, error: undefined });
+              addTerminalLog('🎉 Deployment completed successfully!', 'success');
+              addTerminalLog(`🌐 Your agent is now live at: ${agent.vercel_url}`, 'success');
+              addTerminalLog('📋 Embed code generated and ready to use', 'success');
+              setShowScriptModal(true);
+            } else {
+              // Still not ready, show the script modal anyway
+              updateDeploymentStep('live', { loading: false, completed: true });
+              addTerminalLog('⚠️ Deployment in progress, script ready', 'warning');
+              addTerminalLog('📋 You can get your embed code now', 'info');
+              setShowScriptModal(true);
+            }
+          } catch (error) {
+            console.error('Error checking deployment status:', error);
+            updateDeploymentStep('live', { loading: false, completed: true });
+            addTerminalLog('⚠️ Status check failed, but trigger was sent', 'warning');
+            setShowScriptModal(true);
+          }
+        }, 30000); // Check after 30 seconds
+        
+      } else {
+        throw new Error(result.error || 'Failed to trigger deployment');
+      }
+    } catch (error: any) {
+      updateDeploymentStep('live', { loading: false, error: error.message });
+      addTerminalLog(`❌ Trigger failed: ${error.message}`, 'error');
     } finally {
-      setLoading(false);
+      setTriggerLoading(false);
     }
   };
 
-  const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text);
-    toast.success('Copied to clipboard!');
+  // Copy embed code to clipboard
+  const copyEmbedCode = () => {
+    if (embedCode) {
+      navigator.clipboard.writeText(embedCode);
+      toast.success('Embed code copied to clipboard!');
+    }
+  };
+
+  // Show script modal
+  const handleGetYourAgent = () => {
+    setShowScriptModal(true);
   };
 
   const renderStepContent = () => {
     switch (currentStep) {
+      case 0:
+        return (
+          <div className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <Input
+                label="Your Name"
+                name="name"
+                value={formData.name}
+                onChange={handleInputChange}
+                placeholder="John Doe"
+                required
+              />
+              <Input
+                label="Brand Name"
+                name="brandName"
+                value={formData.brandName}
+                onChange={handleInputChange}
+                placeholder="Acme Corp"
+                required
+              />
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <Input
+                label="Website Name"
+                name="websiteName"
+                value={formData.websiteName}
+                onChange={handleInputChange}
+                placeholder="acme.com"
+              />
+              <Input
+                label="AI Agent Name"
+                name="agentName"
+                value={formData.agentName}
+                onChange={handleInputChange}
+                placeholder="Alex"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+                Agent Type
+              </label>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {agentTypes.map((type) => (
+                  <label
+                    key={type.id}
+                    className={`
+                      cursor-pointer p-4 rounded-lg border-2 transition-all
+                      ${formData.agentType === type.id
+                        ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20'
+                        : 'border-gray-200 dark:border-gray-700 hover:border-primary-300'
+                      }
+                    `}
+                  >
+                    <input
+                      type="radio"
+                      name="agentType"
+                      value={type.id}
+                      checked={formData.agentType === type.id}
+                      onChange={handleInputChange}
+                      className="sr-only"
+                    />
+                    <div className="font-medium text-gray-900 dark:text-white">
+                      {type.label}
+                    </div>
+                    <div className="text-sm text-gray-500 dark:text-gray-400">
+                      {type.description}
+                    </div>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Agent Role Description
+                </label>
+                <div className="flex space-x-2">
+                  <button
+                    type="button"
+                    onClick={() => rewriteDescription('professional')}
+                    className="text-xs px-2 py-1 bg-primary-100 text-primary-700 rounded hover:bg-primary-200 transition-colors"
+                  >
+                    Pro
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => rewriteDescription('fun')}
+                    className="text-xs px-2 py-1 bg-secondary-100 text-secondary-700 rounded hover:bg-secondary-200 transition-colors"
+                  >
+                    Fun
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => rewriteDescription('casual')}
+                    className="text-xs px-2 py-1 bg-accent-100 text-accent-700 rounded hover:bg-accent-200 transition-colors"
+                  >
+                    Casual
+                  </button>
+                </div>
+              </div>
+              <Textarea
+                name="roleDescription"
+                value={formData.roleDescription}
+                onChange={handleInputChange}
+                placeholder="Describe what your AI agent does and how it helps customers..."
+                rows={4}
+                required
+              />
+            </div>
+          </div>
+        );
+
       case 1:
         return (
-          <div className="space-y-8">
-            {/* Basic Information */}
-            <Card className="p-6">
-              <div className="flex items-center space-x-3 mb-6">
-                <div className="w-8 h-8 bg-gradient-to-r from-primary-500 to-secondary-500 rounded-full flex items-center justify-center">
-                  <Bot className="w-4 h-4 text-white" />
+          <div className="space-y-6">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+                Services Offered
+              </label>
+              {formData.services.map((service, index) => (
+                <div key={index} className="flex space-x-2 mb-2">
+                  <Input
+                    placeholder="Enter a service..."
+                    value={service}
+                    onChange={(e) => handleServiceChange(index, e.target.value)}
+                    className="flex-1"
+                  />
+                  {formData.services.length > 1 && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => removeService(index)}
+                      className="px-3"
+                    >
+                      ×
+                    </Button>
+                  )}
                 </div>
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                  Basic Information
-                </h3>
-              </div>
+              ))}
+              <Button
+                type="button"
+                variant="outline"
+                onClick={addService}
+                className="mt-2"
+              >
+                Add Service
+              </Button>
+            </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <Input
-                  label="Agent Name"
-                  value={formData.name}
-                  onChange={(e) => handleInputChange('name', e.target.value)}
-                  placeholder="e.g., Sarah, Alex, Assistant"
-                  required
-                />
-                <Input
-                  label="Brand Name"
-                  value={formData.brandName}
-                  onChange={(e) => handleInputChange('brandName', e.target.value)}
-                  placeholder="e.g., TechCorp Inc."
-                  required
-                />
-                <Input
-                  label="Website Name"
-                  value={formData.websiteName}
-                  onChange={(e) => handleInputChange('websiteName', e.target.value)}
-                  placeholder="e.g., TechCorp Website"
-                />
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Agent Type
-                  </label>
-                  <select
-                    value={formData.agentType}
-                    onChange={(e) => handleInputChange('agentType', e.target.value)}
-                    className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white/80 dark:bg-gray-800/80 px-3 py-2 text-gray-900 dark:text-white"
-                  >
-                    <option value="customer-support">Customer Support</option>
-                    <option value="sales-assistant">Sales Assistant</option>
-                    <option value="lead-generation">Lead Generation</option>
-                    <option value="product-guide">Product Guide</option>
-                    <option value="booking-assistant">Booking Assistant</option>
-                    <option value="general-assistant">General Assistant</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="mt-6">
-                <Textarea
-                  label="Role Description"
-                  value={formData.roleDescription}
-                  onChange={(e) => handleInputChange('roleDescription', e.target.value)}
-                  placeholder="Describe what your agent does and how it helps customers..."
-                  rows={3}
-                  required
-                />
-              </div>
-            </Card>
-
-            {/* Services */}
-            <Card className="p-6">
-              <div className="flex items-center justify-between mb-6">
-                <div className="flex items-center space-x-3">
-                  <div className="w-8 h-8 bg-gradient-to-r from-primary-500 to-secondary-500 rounded-full flex items-center justify-center">
-                    <Settings className="w-4 h-4 text-white" />
-                  </div>
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                    Services Offered
-                  </h3>
-                </div>
-                <Button variant="outline" size="sm" onClick={addService}>
-                  <Plus className="w-4 h-4 mr-1" />
-                  Add Service
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Frequently Asked Questions
+                </label>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={suggestFAQs}
+                  className="text-sm"
+                >
+                  <Sparkles className="w-4 h-4 mr-1" />
+                  Suggest FAQs
                 </Button>
               </div>
-
-              <div className="space-y-3">
-                {formData.services.map((service, index) => (
-                  <div key={serviceKeys[index]} className="flex items-center space-x-3">
+              
+              {formData.faqs.map((faq, index) => (
+                <Card key={index} className="p-4 mb-4">
+                  <div className="space-y-3">
                     <Input
-                      value={service}
-                      onChange={(e) => updateService(index, e.target.value)}
-                      placeholder="e.g., Technical support, Product information"
-                      className="flex-1"
+                      placeholder="Question..."
+                      value={faq.question}
+                      onChange={(e) => handleFAQChange(index, 'question', e.target.value)}
                     />
-                    {formData.services.length > 1 && (
+                    <Textarea
+                      placeholder="Answer..."
+                      value={faq.answer}
+                      onChange={(e) => handleFAQChange(index, 'answer', e.target.value)}
+                      rows={2}
+                    />
+                    {formData.faqs.length > 1 && (
                       <Button
+                        type="button"
                         variant="outline"
-                        size="sm"
-                        onClick={() => removeService(index)}
-                        className="text-red-600 hover:text-red-700"
+                        onClick={() => removeFAQ(index)}
+                        className="text-sm"
                       >
-                        <Minus className="w-4 h-4" />
+                        Remove FAQ
                       </Button>
                     )}
                   </div>
-                ))}
-              </div>
-            </Card>
-
-            {/* FAQs */}
-            <Card className="p-6">
-              <div className="flex items-center justify-between mb-6">
-                <div className="flex items-center space-x-3">
-                  <div className="w-8 h-8 bg-gradient-to-r from-primary-500 to-secondary-500 rounded-full flex items-center justify-center">
-                    <MessageSquare className="w-4 h-4 text-white" />
-                  </div>
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                    Frequently Asked Questions
-                  </h3>
-                </div>
-                <Button variant="outline" size="sm" onClick={addFAQ}>
-                  <Plus className="w-4 h-4 mr-1" />
-                  Add FAQ
-                </Button>
-              </div>
-
-              <div className="space-y-4">
-                {formData.faqs.map((faq, index) => (
-                  <div key={faqKeys[index]} className="border border-gray-200 dark:border-gray-700 rounded-lg p-4">
-                    <div className="flex items-center justify-between mb-3">
-                      <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                        FAQ #{index + 1}
-                      </span>
-                      {formData.faqs.length > 1 && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => removeFAQ(index)}
-                          className="text-red-600 hover:text-red-700"
-                        >
-                          <Minus className="w-4 h-4" />
-                        </Button>
-                      )}
-                    </div>
-                    <div className="space-y-3">
-                      <Input
-                        placeholder="Question"
-                        value={faq.question}
-                        onChange={(e) => updateFAQ(index, 'question', e.target.value)}
-                      />
-                      <Textarea
-                        placeholder="Answer"
-                        value={faq.answer}
-                        onChange={(e) => updateFAQ(index, 'answer', e.target.value)}
-                        rows={2}
-                      />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </Card>
-
-            {/* Customization */}
-            <Card className="p-6">
-              <div className="flex items-center space-x-3 mb-6">
-                <div className="w-8 h-8 bg-gradient-to-r from-primary-500 to-secondary-500 rounded-full flex items-center justify-center">
-                  <Palette className="w-4 h-4 text-white" />
-                </div>
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                  Customization
-                </h3>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <Input
-                  label="Primary Color"
-                  type="color"
-                  value={formData.primaryColor}
-                  onChange={(e) => handleInputChange('primaryColor', e.target.value)}
-                />
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Tone
-                  </label>
-                  <select
-                    value={formData.tone}
-                    onChange={(e) => handleInputChange('tone', e.target.value)}
-                    className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white/80 dark:bg-gray-800/80 px-3 py-2 text-gray-900 dark:text-white"
-                  >
-                    <option value="professional">Professional</option>
-                    <option value="friendly">Friendly</option>
-                    <option value="witty">Witty</option>
-                    <option value="minimal">Minimal</option>
-                  </select>
-                </div>
-                <Input
-                  label="Avatar URL (optional)"
-                  value={formData.avatarUrl}
-                  onChange={(e) => handleInputChange('avatarUrl', e.target.value)}
-                  placeholder="https://example.com/avatar.jpg"
-                />
-                <Input
-                  label="Office Hours (optional)"
-                  value={formData.officeHours}
-                  onChange={(e) => handleInputChange('officeHours', e.target.value)}
-                  placeholder="e.g., Mon-Fri 9AM-5PM EST"
-                />
-              </div>
-
-              <div className="mt-6">
-                <Input
-                  label="Subdomain"
-                  value={formData.subdomain}
-                  onChange={(e) => handleInputChange('subdomain', e.target.value)}
-                  placeholder="your-agent-name"
-                />
-                <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                  Your agent will be available at: {formData.subdomain || 'your-agent-name'}.vercel.app
-                </p>
-              </div>
-            </Card>
-
-            {/* Knowledge Base */}
-            <Card className="p-6">
-              <div className="flex items-center space-x-3 mb-6">
-                <div className="w-8 h-8 bg-gradient-to-r from-primary-500 to-secondary-500 rounded-full flex items-center justify-center">
-                  <Brain className="w-4 h-4 text-white" />
-                </div>
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                  Knowledge Base
-                </h3>
-              </div>
-
-              <Textarea
-                label="Additional Knowledge"
-                value={formData.knowledge}
-                onChange={(e) => handleInputChange('knowledge', e.target.value)}
-                placeholder="Add any additional information your agent should know about your business, products, or services..."
-                rows={6}
-              />
-            </Card>
-
-            {/* Generate Button */}
-            <div className="flex justify-center">
+                </Card>
+              ))}
+              
               <Button
-                size="lg"
-                onClick={handleGenerateAgent}
-                disabled={loading}
-                loading={loading}
-                className="px-8 py-3"
+                type="button"
+                variant="outline"
+                onClick={addFAQ}
               >
-                <Sparkles className="w-5 h-5 mr-2" />
-                Generate AI Agent
+                Add FAQ
               </Button>
             </div>
+
+            <Textarea
+              label="Additional Knowledge"
+              name="knowledge"
+              value={formData.knowledge}
+              onChange={handleInputChange}
+              placeholder="Add any additional information your agent should know about your business..."
+              rows={4}
+            />
           </div>
         );
 
       case 2:
         return (
-          <div className="max-w-2xl mx-auto">
-            <Card className="p-8">
-              <div className="text-center mb-8">
-                <div className="w-16 h-16 bg-gradient-to-r from-primary-500 to-secondary-500 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <Upload className="w-8 h-8 text-white" />
+          <div className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+                  Primary Brand Color
+                </label>
+                <div className="flex items-center space-x-3">
+                  <input
+                    type="color"
+                    name="primaryColor"
+                    value={formData.primaryColor}
+                    onChange={handleInputChange}
+                    className="w-12 h-12 rounded-lg border border-gray-300 cursor-pointer"
+                  />
+                  <Input
+                    value={formData.primaryColor}
+                    onChange={handleInputChange}
+                    name="primaryColor"
+                    placeholder="#3b82f6"
+                    className="flex-1"
+                  />
                 </div>
-                <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
-                  Deploying Your Agent
-                </h2>
-                <p className="text-gray-600 dark:text-gray-300">
-                  Please wait while we create and deploy your AI agent
-                </p>
               </div>
 
-              <div className="space-y-6">
-                {deploymentSteps.map((step) => (
-                  <div key={step.id} className="flex items-start space-x-4">
-                    <div className={`
-                      w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 mt-1
-                      ${step.status === 'completed' ? 'bg-green-100 text-green-600' :
-                        step.status === 'loading' ? 'bg-blue-100 text-blue-600' :
-                        step.status === 'error' ? 'bg-red-100 text-red-600' :
-                        'bg-gray-100 text-gray-400'}
-                    `}>
-                      {step.status === 'completed' ? (
-                        <Check className="w-4 h-4" />
-                      ) : step.status === 'loading' ? (
-                        <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
-                      ) : step.status === 'error' ? (
-                        <AlertCircle className="w-4 h-4" />
-                      ) : (
-                        <div className="w-2 h-2 bg-gray-400 rounded-full" />
-                      )}
-                    </div>
-                    <div className="flex-1">
-                      <h3 className="font-medium text-gray-900 dark:text-white">
-                        {step.title}
-                      </h3>
-                      <p className="text-sm text-gray-600 dark:text-gray-300">
-                        {step.description}
-                      </p>
-                    </div>
-                  </div>
-                ))}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+                  AI Tone
+                </label>
+                <div className="space-y-2">
+                  {tones.map((tone) => (
+                    <label
+                      key={tone.id}
+                      className={`
+                        cursor-pointer flex items-center p-3 rounded-lg border transition-all
+                        ${formData.tone === tone.id
+                          ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20'
+                          : 'border-gray-200 dark:border-gray-700 hover:border-primary-300'
+                        }
+                      `}
+                    >
+                      <input
+                        type="radio"
+                        name="tone"
+                        value={tone.id}
+                        checked={formData.tone === tone.id}
+                        onChange={handleInputChange}
+                        className="sr-only"
+                      />
+                      <div>
+                        <div className="font-medium text-gray-900 dark:text-white">
+                          {tone.label}
+                        </div>
+                        <div className="text-sm text-gray-500 dark:text-gray-400">
+                          {tone.description}
+                        </div>
+                      </div>
+                    </label>
+                  ))}
+                </div>
               </div>
-            </Card>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+                Agent Avatar (Optional)
+              </label>
+              <div className="flex items-center space-x-4">
+                <div className="w-16 h-16 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center overflow-hidden">
+                  {formData.avatarUrl ? (
+                    <img
+                      src={formData.avatarUrl}
+                      alt="Avatar"
+                      className="w-full h-full object-cover"
+                    />
+                  ) : formData.avatar ? (
+                    <img
+                      src={URL.createObjectURL(formData.avatar)}
+                      alt="Avatar"
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <Bot className="w-8 h-8 text-gray-400" />
+                  )}
+                </div>
+                <div>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleAvatarUpload}
+                    className="hidden"
+                    id="avatar-upload"
+                  />
+                  <label htmlFor="avatar-upload">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="cursor-pointer"
+                      onClick={() => document.getElementById('avatar-upload')?.click()}
+                    >
+                      <Upload className="w-4 h-4 mr-2" />
+                      Upload Avatar
+                    </Button>
+                  </label>
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                    PNG or JPG, max 1MB
+                  </p>
+                </div>
+              </div>
+            </div>
           </div>
         );
 
       case 3:
         return (
-          <div className="max-w-4xl mx-auto">
-            <Card className="p-8">
-              <div className="text-center mb-8">
-                <div className="w-16 h-16 bg-gradient-to-r from-green-500 to-emerald-500 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <Check className="w-8 h-8 text-white" />
+          <div className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Input
+                  label="Custom Subdomain"
+                  name="subdomain"
+                  value={formData.subdomain}
+                  onChange={handleInputChange}
+                  placeholder="my-awesome-agent"
+                />
+                <div className="flex items-center justify-between mt-2">
+                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                    Your agent will be available at: {formData.subdomain}.vercel.app
+                  </p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={generateSubdomain}
+                    className="text-sm"
+                  >
+                    Generate
+                  </Button>
                 </div>
-                <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
-                  🎉 Agent Successfully Deployed!
-                </h2>
-                <p className="text-gray-600 dark:text-gray-300">
-                  Your AI agent is now live and ready to engage with your customers
-                </p>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-                {previewUrl && (
-                  <Card className="p-6">
-                    <div className="flex items-center space-x-3 mb-4">
-                      <Globe className="w-6 h-6 text-primary-600" />
-                      <h3 className="font-semibold text-gray-900 dark:text-white">
-                        Live Preview
-                      </h3>
+              <Input
+                label="Office Hours (Optional)"
+                name="officeHours"
+                value={formData.officeHours}
+                onChange={handleInputChange}
+                placeholder="9:00 AM - 5:00 PM EST"
+                icon={<Clock className="w-5 h-5 text-gray-400" />}
+              />
+            </div>
+
+            {/* Deployment Steps */}
+            <Card className="p-6">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-6">
+                Deploy Your Agent
+              </h3>
+              
+              <div className="space-y-4">
+                {deploymentSteps.map((step, index) => (
+                  <div
+                    key={step.id}
+                    className={`
+                      flex items-center justify-between p-4 rounded-lg border-2 transition-all
+                      ${step.completed 
+                        ? 'border-green-200 bg-green-50 dark:bg-green-900/20 dark:border-green-800' 
+                        : step.loading
+                        ? 'border-primary-200 bg-primary-50 dark:bg-primary-900/20 dark:border-primary-800'
+                        : 'border-gray-200 dark:border-gray-700'
+                      }
+                    `}
+                  >
+                    <div className="flex items-center space-x-3">
+                      <div className={`
+                        w-10 h-10 rounded-full flex items-center justify-center
+                        ${step.completed 
+                          ? 'bg-green-500 text-white' 
+                          : step.loading
+                          ? 'bg-primary-500 text-white'
+                          : 'bg-gray-200 dark:bg-gray-700 text-gray-500'
+                        }
+                      `}>
+                        {step.completed ? (
+                          <CheckCircle className="w-5 h-5" />
+                        ) : step.loading ? (
+                          <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" />
+                        ) : (
+                          step.icon
+                        )}
+                      </div>
+                      <div>
+                        <h4 className="font-medium text-gray-900 dark:text-white">
+                          {step.title}
+                        </h4>
+                        <p className="text-sm text-gray-500 dark:text-gray-400">
+                          {step.description}
+                        </p>
+                      </div>
                     </div>
-                    <p className="text-sm text-gray-600 dark:text-gray-300 mb-4">
-                      Test your agent before embedding it on your website
-                    </p>
+
                     <div className="flex items-center space-x-2">
-                      <input
-                        type="text"
-                        value={previewUrl}
-                        readOnly
-                        className="flex-1 p-2 text-sm border border-gray-300 dark:border-gray-600 rounded bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-white"
-                      />
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => window.open(previewUrl, '_blank')}
-                      >
-                        <ExternalLink className="w-4 h-4" />
-                      </Button>
-                    </div>
-                  </Card>
-                )}
+                      {step.id === 'generate' && (
+                        <Button
+                          onClick={handleGenerateCode}
+                          disabled={step.completed || step.loading}
+                          loading={step.loading}
+                          size="sm"
+                        >
+                          Generate
+                        </Button>
+                      )}
+                      
+                      {step.id === 'github' && (
+                        <Button
+                          onClick={handleUploadToGitHub}
+                          disabled={!deploymentSteps[0].completed || step.completed || step.loading}
+                          loading={step.loading}
+                          size="sm"
+                        >
+                          Upload
+                        </Button>
+                      )}
+                      
+                      {step.id === 'deploy' && (
+                        <Button
+                          onClick={handleDeployToVercel}
+                          disabled={!deploymentSteps[1].completed || step.completed || step.loading}
+                          loading={step.loading}
+                          size="sm"
+                        >
+                          Deploy
+                        </Button>
+                      )}
 
-                {embedCode && (
-                  <Card className="p-6">
-                    <div className="flex items-center space-x-3 mb-4">
-                      <Code className="w-6 h-6 text-primary-600" />
-                      <h3 className="font-semibold text-gray-900 dark:text-white">
-                        Embed Code
-                      </h3>
+                      {step.id === 'live' && (
+                        <Button
+                          onClick={handleMakeItLive}
+                          disabled={!deploymentSteps[2].completed || step.completed || step.loading || !showManualTrigger}
+                          loading={step.loading}
+                          size="sm"
+                          className="bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white"
+                        >
+                          <Zap className="w-4 h-4 mr-1" />
+                          Make it Live
+                        </Button>
+                      )}
                     </div>
-                    <p className="text-sm text-gray-600 dark:text-gray-300 mb-4">
-                      Add this code to your website to display the floating agent
-                    </p>
-                    <div className="relative">
-                      <pre className="bg-gray-100 dark:bg-gray-800 p-3 rounded text-xs font-mono overflow-x-auto">
-                        {embedCode}
-                      </pre>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => copyToClipboard(embedCode)}
-                        className="absolute top-2 right-2"
-                      >
-                        <Copy className="w-4 h-4" />
-                      </Button>
-                    </div>
-                  </Card>
-                )}
+                  </div>
+                ))}
               </div>
 
-              <div className="flex flex-col sm:flex-row items-center justify-center space-y-4 sm:space-y-0 sm:space-x-4">
-                <Button
-                  onClick={() => navigate('/dashboard')}
-                  className="px-6"
-                >
-                  Go to Dashboard
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    setCurrentStep(1);
-                    setFormData({
-                      name: '',
-                      brandName: '',
-                      websiteName: '',
-                      agentType: 'customer-support',
-                      roleDescription: '',
-                      services: [''],
-                      faqs: [{ question: '', answer: '' }],
-                      primaryColor: '#3b82f6',
-                      tone: 'professional',
-                      avatarUrl: '',
-                      subdomain: '',
-                      officeHours: '',
-                      knowledge: '',
-                    });
-                    setServiceKeys(['service-0']);
-                    setFaqKeys(['faq-0']);
-                    setAgentId(null);
-                    setEmbedCode('');
-                    setPreviewUrl('');
-                  }}
-                  className="px-6"
-                >
-                  Create Another Agent
-                </Button>
-              </div>
+              {/* Terminal UI */}
+              {showTerminal && (
+                <div className="mt-6">
+                  <div className="bg-gray-900 rounded-lg overflow-hidden">
+                    <div className="flex items-center justify-between px-4 py-2 bg-gray-800">
+                      <div className="flex items-center space-x-2">
+                        <Terminal className="w-4 h-4 text-green-400" />
+                        <span className="text-sm text-gray-300 font-mono">Deployment Console</span>
+                      </div>
+                      <div className="flex space-x-2">
+                        <div className="w-3 h-3 bg-red-500 rounded-full"></div>
+                        <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
+                        <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                      </div>
+                    </div>
+                    <div className="p-4 h-64 overflow-y-auto font-mono text-sm">
+                      {terminalLogs.map((log) => (
+                        <motion.div
+                          key={log.id}
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          className={`mb-1 ${
+                            log.type === 'success' ? 'text-green-400' :
+                            log.type === 'error' ? 'text-red-400' :
+                            log.type === 'warning' ? 'text-yellow-400' :
+                            'text-gray-300'
+                          }`}
+                        >
+                          <span className="text-gray-500">
+                            [{log.timestamp.toLocaleTimeString()}]
+                          </span>{' '}
+                          {log.text}
+                        </motion.div>
+                      ))}
+                      {terminalLogs.length === 0 && (
+                        <div className="text-gray-500">
+                          Waiting for deployment to start...
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Success State */}
+              {deploymentSteps.every(step => step.completed) && embedCode && (
+                <div className="mt-6 p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
+                  <h4 className="font-medium text-green-800 dark:text-green-200 mb-4">
+                    🎉 Your AI Agent is Live!
+                  </h4>
+                  
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-green-700 dark:text-green-300">Live URL:</span>
+                      <a 
+                        href={vercelUrl!} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="text-primary-600 hover:text-primary-500 flex items-center text-sm"
+                      >
+                        {vercelUrl} <ExternalLink className="w-3 h-3 ml-1" />
+                      </a>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-green-700 dark:text-green-300 mb-2">
+                        Embed Code (Copy & Paste to Your Website):
+                      </label>
+                      <div className="relative">
+                        <pre className="bg-gray-100 dark:bg-gray-800 p-3 rounded text-xs font-mono overflow-x-auto text-gray-800 dark:text-gray-200">
+                          {embedCode}
+                        </pre>
+                        <Button
+                          onClick={copyEmbedCode}
+                          variant="outline"
+                          size="sm"
+                          className="absolute top-2 right-2"
+                        >
+                          <Copy className="w-3 h-3" />
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="mt-4">
+                    <Button
+                      onClick={() => navigate('/dashboard')}
+                      className="w-full"
+                    >
+                      Go to Dashboard
+                    </Button>
+                  </div>
+                </div>
+              )}
             </Card>
           </div>
         );
@@ -739,62 +1111,214 @@ export const Create: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-secondary-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-secondary-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 py-8">
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
-        <div className="text-center mb-8">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8 }}
-          >
-            <h1 className="text-3xl md:text-4xl font-bold text-gray-900 dark:text-white mb-4">
-              Create Your AI Agent
-            </h1>
-            <p className="text-lg text-gray-600 dark:text-gray-300 max-w-2xl mx-auto">
-              Build an intelligent AI assistant for your business in minutes. 
-              No coding required.
-            </p>
-          </motion.div>
-        </div>
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="text-center mb-8"
+        >
+          <h1 className="text-3xl md:text-4xl font-bold text-gray-900 dark:text-white mb-4">
+            Create Your AI Agent
+          </h1>
+          <p className="text-lg text-gray-600 dark:text-gray-300">
+            Build a custom AI assistant tailored to your business needs
+          </p>
+        </motion.div>
 
         {/* Progress Steps */}
-        <div className="flex items-center justify-center mb-8">
-          <div className="flex items-center space-x-4">
-            {[1, 2, 3].map((step) => (
-              <div key={step} className="flex items-center">
-                <div className={`
-                  w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium
-                  ${currentStep >= step 
-                    ? 'bg-primary-600 text-white' 
-                    : 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300'
-                  }
-                `}>
-                  {step}
-                </div>
-                {step < 3 && (
-                  <div className={`
-                    w-12 h-0.5 mx-2
-                    ${currentStep > step 
-                      ? 'bg-primary-600' 
-                      : 'bg-gray-200 dark:bg-gray-700'
-                    }
-                  `} />
+        <div className="mb-8">
+          <div className="flex items-center justify-between">
+            {steps.map((step, index) => (
+              <div
+                key={index}
+                className={`flex flex-col items-center flex-1 ${
+                  index < steps.length - 1 ? 'relative' : ''
+                }`}
+              >
+                {index < steps.length - 1 && (
+                  <div
+                    className={`absolute top-6 left-1/2 w-full h-0.5 ${
+                      index < currentStep ? 'bg-primary-500' : 'bg-gray-200 dark:bg-gray-700'
+                    }`}
+                    style={{ transform: 'translateX(50%)' }}
+                  />
                 )}
+                <div
+                  className={`
+                    w-12 h-12 rounded-full flex items-center justify-center relative z-10 transition-all
+                    ${index <= currentStep
+                      ? 'bg-primary-500 text-white'
+                      : 'bg-gray-200 dark:bg-gray-700 text-gray-400'
+                    }
+                  `}
+                >
+                  {step.icon}
+                </div>
+                <div className="text-center mt-2">
+                  <div className={`text-sm font-medium ${
+                    index <= currentStep ? 'text-primary-600 dark:text-primary-400' : 'text-gray-500'
+                  }`}>
+                    {step.title}
+                  </div>
+                  <div className="text-xs text-gray-500 dark:text-gray-400 hidden md:block">
+                    {step.description}
+                  </div>
+                </div>
               </div>
             ))}
           </div>
         </div>
 
-        {/* Step Content */}
-        <motion.div
-          key={currentStep}
-          initial={{ opacity: 0, x: 20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.5 }}
-        >
-          {renderStepContent()}
-        </motion.div>
+        {/* Form Content */}
+        <Card className="p-8">
+          <motion.div
+            key={currentStep}
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -20 }}
+            transition={{ duration: 0.3 }}
+          >
+            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">
+              {steps[currentStep].title}
+            </h2>
+            {renderStepContent()}
+          </motion.div>
+
+          {/* Navigation */}
+          <div className="flex justify-between items-center mt-8 pt-6 border-t border-gray-200 dark:border-gray-700">
+            <Button
+              variant="outline"
+              onClick={prevStep}
+              disabled={currentStep === 0}
+              className="flex items-center"
+            >
+              <ChevronLeft className="w-4 h-4 mr-1" />
+              Previous
+            </Button>
+
+            <div className="flex space-x-3">
+              <Button
+                variant="ghost"
+                className="flex items-center"
+              >
+                <Save className="w-4 h-4 mr-1" />
+                Save Draft
+              </Button>
+
+              {currentStep < steps.length - 1 && (
+                <Button
+                  onClick={nextStep}
+                  className="flex items-center"
+                >
+                  Next
+                  <ChevronRight className="w-4 h-4 ml-1" />
+                </Button>
+              )}
+            </div>
+          </div>
+        </Card>
+
+        {/* Script Modal */}
+        {showScriptModal && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              className="bg-white dark:bg-gray-800 rounded-2xl p-8 max-w-2xl w-full max-h-[90vh] overflow-y-auto"
+            >
+              <div className="text-center mb-6">
+                <div className="w-16 h-16 bg-gradient-to-r from-primary-500 to-secondary-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <CheckCircle className="w-8 h-8 text-white" />
+                </div>
+                <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+                  🎉 Your AI Agent is Ready!
+                </h3>
+                <p className="text-gray-600 dark:text-gray-300">
+                  Copy the embed code below and paste it into your website
+                </p>
+              </div>
+
+              <div className="space-y-6">
+                {vercelUrl && !vercelUrl.includes('dashboard') && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Live Preview:
+                    </label>
+                    <div className="flex items-center space-x-2">
+                      <input
+                        type="text"
+                        value={vercelUrl}
+                        readOnly
+                        className="flex-1 p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
+                      />
+                      <Button
+                        onClick={() => window.open(vercelUrl, '_blank')}
+                        variant="outline"
+                      >
+                        <ExternalLink className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Embed Code:
+                  </label>
+                  <div className="relative">
+                    <pre className="bg-gray-100 dark:bg-gray-800 p-4 rounded-lg text-sm font-mono overflow-x-auto text-gray-800 dark:text-gray-200 border">
+{embedCode || `<!-- ${formData.brandName} AI Assistant - Generated by PLUDO.AI -->
+<script src="${vercelUrl || 'https://your-agent.vercel.app'}/float.js" defer></script>`}
+                    </pre>
+                    <Button
+                      onClick={() => {
+                        const code = embedCode || `<!-- ${formData.brandName} AI Assistant - Generated by PLUDO.AI -->
+<script src="${vercelUrl || 'https://your-agent.vercel.app'}/float.js" defer></script>`;
+                        navigator.clipboard.writeText(code);
+                        toast.success('Embed code copied to clipboard!');
+                      }}
+                      variant="outline"
+                      size="sm"
+                      className="absolute top-2 right-2"
+                    >
+                      <Copy className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg">
+                  <h4 className="font-medium text-blue-900 dark:text-blue-200 mb-2">
+                    How to add to your website:
+                  </h4>
+                  <ol className="text-sm text-blue-800 dark:text-blue-300 space-y-1 list-decimal list-inside">
+                    <li>Copy the embed code above</li>
+                    <li>Paste it into your website's HTML, before the closing &lt;/body&gt; tag</li>
+                    <li>Your AI agent will appear as a floating chat button</li>
+                    <li>Test it to ensure it's working correctly</li>
+                  </ol>
+                </div>
+              </div>
+
+              <div className="flex space-x-3 mt-8">
+                <Button
+                  onClick={() => setShowScriptModal(false)}
+                  variant="outline"
+                  className="flex-1"
+                >
+                  Close
+                </Button>
+                <Button
+                  onClick={() => navigate('/dashboard')}
+                  className="flex-1"
+                >
+                  Go to Dashboard
+                </Button>
+              </div>
+            </motion.div>
+          </div>
+        )}
       </div>
     </div>
   );
