@@ -12,7 +12,11 @@ interface AgentConfig {
   subdomain: string;
   officeHours?: string;
   knowledge: string;
-  vercelUrl?: string; // Add vercelUrl to config
+  vercelUrl?: string;
+  // New API configuration fields
+  apiProvider: string;
+  apiKey: string;
+  model: string;
 }
 
 export function generateAgentFiles(config: AgentConfig, vercelUrl?: string): { path: string; content: string }[] {
@@ -367,6 +371,19 @@ ${config.knowledge || 'No additional information provided.'}`
 /*
   X-Frame-Options: SAMEORIGIN
   X-Content-Type-Options: nosniff`
+    },
+    {
+      path: '.env',
+      content: `# AI Configuration
+VITE_API_PROVIDER=${config.apiProvider}
+VITE_API_KEY=${config.apiKey}
+VITE_AI_MODEL=${config.model}
+
+# Agent Configuration
+VITE_AGENT_NAME=${config.name}
+VITE_BRAND_NAME=${config.brandName}
+VITE_PRIMARY_COLOR=${config.primaryColor}
+VITE_TONE=${config.tone}`
     }
   ];
 
@@ -956,33 +973,27 @@ export const FloatingButton: React.FC<FloatingButtonProps> = ({ onClick }) => {
 }
 
 function generateAIService(config: AgentConfig): string {
-  return `interface Message {
-  id: string;
-  text: string;
-  isUser: boolean;
-  timestamp: Date;
-}
+  const getApiEndpoint = () => {
+    if (config.apiProvider === 'openrouter') {
+      return 'https://openrouter.ai/api/v1/chat/completions';
+    } else if (config.apiProvider === 'gemini') {
+      return `https://generativelanguage.googleapis.com/v1beta/models/${config.model}:generateContent`;
+    }
+    return 'https://openrouter.ai/api/v1/chat/completions';
+  };
 
-const OPENROUTER_API_KEY = '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';
-
-export async function sendMessage(message: string, history: Message[], config: any): Promise<string> {
-  const systemPrompt = await createSystemPrompt(config);
-  const conversationHistory = history.slice(-10).map(msg => ({
-    role: msg.isUser ? 'user' : 'assistant',
-    content: msg.text
-  }));
-
-  try {
-    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+  const generateOpenRouterRequest = () => {
+    return `
+    const response = await fetch('${getApiEndpoint()}', {
       method: 'POST',
       headers: {
-        'Authorization': \`Bearer \${OPENROUTER_API_KEY}\`,
+        'Authorization': \`Bearer \${API_KEY}\`,
         'Content-Type': 'application/json',
         'HTTP-Referer': window.location.origin,
         'X-Title': \`\${config.brandName} AI Assistant\`
       },
       body: JSON.stringify({
-        model: 'deepseek/deepseek-r1',
+        model: '${config.model}',
         messages: [
           { role: 'system', content: systemPrompt },
           ...conversationHistory,
@@ -1001,7 +1012,60 @@ export async function sendMessage(message: string, history: Message[], config: a
     }
 
     const data = await response.json();
-    return data.choices[0]?.message?.content || 'Sorry, I could not process your request.';
+    return data.choices[0]?.message?.content || 'Sorry, I could not process your request.';`;
+  };
+
+  const generateGeminiRequest = () => {
+    return `
+    // Convert conversation to Gemini format
+    const geminiMessages = [
+      { role: 'user', parts: [{ text: systemPrompt + '\\n\\nUser: ' + message }] }
+    ];
+
+    const response = await fetch('${getApiEndpoint()}?key=' + API_KEY, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        contents: geminiMessages,
+        generationConfig: {
+          temperature: 0.7,
+          maxOutputTokens: 500,
+          topP: 0.9,
+        }
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error(\`API request failed: \${response.status}\`);
+    }
+
+    const data = await response.json();
+    return data.candidates?.[0]?.content?.parts?.[0]?.text || 'Sorry, I could not process your request.';`;
+  };
+
+  return `interface Message {
+  id: string;
+  text: string;
+  isUser: boolean;
+  timestamp: Date;
+}
+
+// Get API configuration from environment variables
+const API_PROVIDER = import.meta.env.VITE_API_PROVIDER || '${config.apiProvider}';
+const API_KEY = import.meta.env.VITE_API_KEY || '${config.apiKey}';
+const AI_MODEL = import.meta.env.VITE_AI_MODEL || '${config.model}';
+
+export async function sendMessage(message: string, history: Message[], config: any): Promise<string> {
+  const systemPrompt = await createSystemPrompt(config);
+  const conversationHistory = history.slice(-10).map(msg => ({
+    role: msg.isUser ? 'user' : 'assistant',
+    content: msg.text
+  }));
+
+  try {
+    ${config.apiProvider === 'gemini' ? generateGeminiRequest() : generateOpenRouterRequest()}
   } catch (error) {
     console.error('AI Service Error:', error);
     return 'I apologize, but I\\'m having trouble connecting right now. Please try again in a moment.';
@@ -1168,11 +1232,17 @@ ${config.roleDescription}
 
 ## Features
 
-- 🤖 Intelligent AI-powered conversations
+- 🤖 Intelligent AI-powered conversations using ${config.apiProvider === 'openrouter' ? 'OpenRouter' : 'Google Gemini'}
 - 💬 Real-time chat interface
 - 📱 Mobile-responsive design
 - 🎨 Custom branded experience
 - ⚡ Fast and reliable responses
+
+## AI Configuration
+
+- **Provider**: ${config.apiProvider === 'openrouter' ? 'OpenRouter' : 'Google Gemini'}
+- **Model**: ${config.model}
+- **Tone**: ${config.tone}
 
 ## Services
 
@@ -1215,6 +1285,8 @@ The AI assistant is configured with:
 - **Brand**: ${config.brandName}
 - **Tone**: ${config.tone}
 - **Primary Color**: ${config.primaryColor}
+- **API Provider**: ${config.apiProvider === 'openrouter' ? 'OpenRouter' : 'Google Gemini'}
+- **Model**: ${config.model}
 ${config.officeHours ? `- **Office Hours**: ${config.officeHours}` : ''}
 
 ## Knowledge Base
@@ -1223,10 +1295,18 @@ The assistant's knowledge is stored in \`knowledge.txt\` and includes:
 
 ${config.faqs.map(faq => `- ${faq.question}`).join('\n')}
 
+## Environment Variables
+
+The following environment variables are configured:
+
+- \`VITE_API_PROVIDER\`: ${config.apiProvider}
+- \`VITE_API_KEY\`: Your API key (encrypted)
+- \`VITE_AI_MODEL\`: ${config.model}
+
 ## Powered By
 
 - **PLUDO.AI** - No-code AI agent generator
-- **OpenRouter** - AI model API
+- **${config.apiProvider === 'openrouter' ? 'OpenRouter' : 'Google Gemini'}** - AI model API
 - **Vercel** - Hosting and deployment
 - **React** - Frontend framework
 - **Tailwind CSS** - Styling

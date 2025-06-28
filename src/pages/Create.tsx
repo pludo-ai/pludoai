@@ -19,7 +19,9 @@ import {
   Download,
   Github,
   Globe,
-  Zap
+  Zap,
+  Key,
+  Shield
 } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
@@ -83,6 +85,10 @@ export const Create: React.FC = () => {
     officeHours: '',
     knowledge: '',
     subdomain: '',
+    // New API configuration fields
+    apiProvider: 'openrouter',
+    apiKey: '',
+    model: 'deepseek/deepseek-r1'
   });
 
   const [faqs, setFaqs] = useState<FAQ[]>([
@@ -109,6 +115,31 @@ export const Create: React.FC = () => {
     makeItLive: false,
   });
 
+  // API Provider options
+  const apiProviders = [
+    {
+      id: 'openrouter',
+      name: 'OpenRouter',
+      description: 'Access to multiple AI models including GPT, Claude, and more',
+      models: [
+        { id: 'deepseek/deepseek-r1', name: 'DeepSeek R1 (Recommended)' },
+        { id: 'openai/gpt-4o', name: 'GPT-4o' },
+        { id: 'anthropic/claude-3.5-sonnet', name: 'Claude 3.5 Sonnet' },
+        { id: 'meta-llama/llama-3.1-8b-instruct', name: 'Llama 3.1 8B' }
+      ]
+    },
+    {
+      id: 'gemini',
+      name: 'Google Gemini',
+      description: 'Google\'s advanced AI model with multimodal capabilities',
+      models: [
+        { id: 'gemini-1.5-pro', name: 'Gemini 1.5 Pro (Recommended)' },
+        { id: 'gemini-1.5-flash', name: 'Gemini 1.5 Flash' },
+        { id: 'gemini-pro', name: 'Gemini Pro' }
+      ]
+    }
+  ];
+
   // Auto-generate subdomain from brand name with random suffix
   useEffect(() => {
     if (formData.brandName) {
@@ -116,6 +147,14 @@ export const Create: React.FC = () => {
       setFormData(prev => ({ ...prev, subdomain: newSubdomain }));
     }
   }, [formData.brandName]);
+
+  // Update available models when API provider changes
+  useEffect(() => {
+    const provider = apiProviders.find(p => p.id === formData.apiProvider);
+    if (provider && provider.models.length > 0) {
+      setFormData(prev => ({ ...prev, model: provider.models[0].id }));
+    }
+  }, [formData.apiProvider]);
 
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -191,6 +230,10 @@ export const Create: React.FC = () => {
     }
     if (formData.services.filter(s => s.trim()).length === 0) {
       toast.error('At least one service is required');
+      return false;
+    }
+    if (!formData.apiKey.trim()) {
+      toast.error('API key is required');
       return false;
     }
     return true;
@@ -352,6 +395,15 @@ export const Create: React.FC = () => {
     }
   };
 
+  const getCurrentProvider = () => {
+    return apiProviders.find(p => p.id === formData.apiProvider);
+  };
+
+  const getCurrentModels = () => {
+    const provider = getCurrentProvider();
+    return provider ? provider.models : [];
+  };
+
   // Check if buttons should be disabled
   const isGenerateCodeDisabled = buttonStates.generateCode || isDeploying;
   const isUploadGithubDisabled = buttonStates.uploadGithub || isDeploying || deploymentSteps[0]?.status !== 'success';
@@ -494,6 +546,114 @@ export const Create: React.FC = () => {
                     </p>
                   </div>
                 )}
+              </Card>
+            </motion.div>
+
+            {/* API Configuration */}
+            <motion.div
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.5, delay: 0.05 }}
+            >
+              <Card className="p-8">
+                <div className="flex items-center space-x-3 mb-6">
+                  <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
+                    <Key className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+                  </div>
+                  <h2 className="text-2xl font-semibold text-gray-900 dark:text-white">
+                    AI Configuration
+                  </h2>
+                </div>
+
+                <div className="space-y-6">
+                  {/* API Provider Selection */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+                      AI Provider
+                    </label>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {apiProviders.map((provider) => (
+                        <div
+                          key={provider.id}
+                          className={`relative cursor-pointer rounded-lg border-2 p-4 transition-all ${
+                            formData.apiProvider === provider.id
+                              ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20'
+                              : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
+                          }`}
+                          onClick={() => handleInputChange('apiProvider', provider.id)}
+                        >
+                          <div className="flex items-center">
+                            <input
+                              type="radio"
+                              name="apiProvider"
+                              value={provider.id}
+                              checked={formData.apiProvider === provider.id}
+                              onChange={() => handleInputChange('apiProvider', provider.id)}
+                              className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300"
+                            />
+                            <div className="ml-3">
+                              <div className="text-sm font-medium text-gray-900 dark:text-white">
+                                {provider.name}
+                              </div>
+                              <div className="text-xs text-gray-500 dark:text-gray-400">
+                                {provider.description}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Model Selection */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      AI Model
+                    </label>
+                    <select
+                      value={formData.model}
+                      onChange={(e) => handleInputChange('model', e.target.value)}
+                      className="block w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm px-3 py-2 text-gray-900 dark:text-white focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 focus:outline-none transition-all duration-200"
+                    >
+                      {getCurrentModels().map((model) => (
+                        <option key={model.id} value={model.id}>
+                          {model.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* API Key Input */}
+                  <div>
+                    <Input
+                      label={`${getCurrentProvider()?.name} API Key`}
+                      type="password"
+                      value={formData.apiKey}
+                      onChange={(e) => handleInputChange('apiKey', e.target.value)}
+                      placeholder={`Enter your ${getCurrentProvider()?.name} API key`}
+                      icon={<Shield className="w-5 h-5 text-gray-400" />}
+                      required
+                    />
+                    <div className="mt-2 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                      <div className="flex items-start">
+                        <Shield className="w-4 h-4 text-blue-600 dark:text-blue-400 mt-0.5 mr-2 flex-shrink-0" />
+                        <div className="text-xs text-blue-800 dark:text-blue-200">
+                          <strong>Secure:</strong> Your API key is encrypted and stored securely. It's only used to power your AI agent's conversations.
+                          {formData.apiProvider === 'openrouter' && (
+                            <div className="mt-1">
+                              Get your API key from <a href="https://openrouter.ai/keys" target="_blank" rel="noopener noreferrer" className="underline">OpenRouter Dashboard</a>
+                            </div>
+                          )}
+                          {formData.apiProvider === 'gemini' && (
+                            <div className="mt-1">
+                              Get your API key from <a href="https://makersuite.google.com/app/apikey" target="_blank" rel="noopener noreferrer" className="underline">Google AI Studio</a>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </Card>
             </motion.div>
 
@@ -741,8 +901,9 @@ export const Create: React.FC = () => {
                       </p>
                     </div>
                     
-                    <div className="text-xs text-gray-500 dark:text-gray-400">
-                      Tone: {formData.tone} • Type: {formData.agentType.replace('-', ' ')}
+                    <div className="text-xs text-gray-500 dark:text-gray-400 space-y-1">
+                      <div>Tone: {formData.tone} • Type: {formData.agentType.replace('-', ' ')}</div>
+                      <div>AI: {getCurrentProvider()?.name} • Model: {getCurrentModels().find(m => m.id === formData.model)?.name}</div>
                     </div>
                   </div>
 
