@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { motion } from 'framer-motion';
+import { motion, useScroll, useTransform, useSpring } from 'framer-motion';
 import { 
   Bot, 
   Zap, 
@@ -19,6 +19,29 @@ import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 
 export const Landing: React.FC = () => {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const { scrollYProgress } = useScroll();
+  
+  // Parallax effects
+  const y1 = useTransform(scrollYProgress, [0, 1], [0, -100]);
+  const y2 = useTransform(scrollYProgress, [0, 1], [0, -200]);
+  const y3 = useTransform(scrollYProgress, [0, 1], [0, -300]);
+  const opacity = useTransform(scrollYProgress, [0, 0.3], [1, 0]);
+  const scale = useTransform(scrollYProgress, [0, 0.3], [1, 1.1]);
+  
+  // Smooth spring animations
+  const springConfig = { stiffness: 100, damping: 30, restDelta: 0.001 };
+  const ySpring1 = useSpring(y1, springConfig);
+  const ySpring2 = useSpring(y2, springConfig);
+  const ySpring3 = useSpring(y3, springConfig);
+
+  useEffect(() => {
+    // Ensure video plays on load
+    if (videoRef.current) {
+      videoRef.current.play().catch(console.error);
+    }
+  }, []);
+
   const features = [
     {
       icon: <Bot className="w-8 h-8" />,
@@ -28,7 +51,7 @@ export const Landing: React.FC = () => {
     {
       icon: <Zap className="w-8 h-8" />,
       title: "Instant Deployment",
-      description: "Deploy your AI agent to the web in seconds. Automatic GitHub repo creation and Vercel hosting included."
+      description: "Deploy your AI agent to the web in seconds. Automatic repository creation and cloud hosting included."
     },
     {
       icon: <Palette className="w-8 h-8" />,
@@ -48,7 +71,7 @@ export const Landing: React.FC = () => {
     {
       icon: <Shield className="w-8 h-8" />,
       title: "Enterprise Security",
-      description: "Your data is secure with enterprise-grade encryption and private repository hosting on GitHub."
+      description: "Your data is secure with enterprise-grade encryption and private repository hosting."
     }
   ];
 
@@ -66,7 +89,7 @@ export const Landing: React.FC = () => {
     {
       number: "03",
       title: "Auto Deploy",
-      description: "Instantly deployed to GitHub and Vercel with a custom domain and embed code ready to use."
+      description: "Instantly deployed to repository and cloud with a custom domain and embed code ready to use."
     }
   ];
 
@@ -96,97 +119,199 @@ export const Landing: React.FC = () => {
 
   return (
     <div className="min-h-screen">
-      {/* Hero Section */}
+      {/* Hero Section with Video Background */}
       <section className="relative min-h-screen flex items-center justify-center overflow-hidden">
-        {/* Background */}
-        <div className="absolute inset-0 bg-gradient-to-br from-primary-50 via-white to-secondary-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900" />
-        <div className="absolute inset-0 bg-[url('data:image/svg+xml,%3Csvg width=%2260%22 height=%2260%22 viewBox=%220 0 60 60%22 xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cg fill=%22none%22 fill-rule=%22evenodd%22%3E%3Cg fill=%22%239C92AC%22 fill-opacity=%220.05%22%3E%3Ccircle cx=%2230%22 cy=%2230%22 r=%224%22/%3E%3C/g%3E%3C/g%3E%3C/svg%3E')] opacity-50" />
+        {/* Video Background */}
+        <motion.div 
+          className="absolute inset-0 z-0"
+          style={{ scale, opacity }}
+        >
+          <div className="absolute inset-0 bg-black/30 z-10" />
+          <iframe
+            ref={videoRef}
+            src="https://streamable.com/e/k5toe4?autoplay=1&nocontrols=1"
+            className="w-full h-full object-cover"
+            style={{
+              width: '100%',
+              height: '100%',
+              border: 'none',
+              position: 'absolute',
+              top: 0,
+              left: 0,
+            }}
+            allow="autoplay; fullscreen"
+            allowFullScreen
+          />
+        </motion.div>
+
+        {/* Gradient Overlay */}
+        <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-transparent to-black/70 z-20" />
         
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+        {/* Animated Particles */}
+        <motion.div 
+          className="absolute inset-0 z-20"
+          style={{ y: ySpring1 }}
+        >
+          {[...Array(20)].map((_, i) => (
+            <motion.div
+              key={i}
+              className="absolute w-2 h-2 bg-white/20 rounded-full"
+              style={{
+                left: `${Math.random() * 100}%`,
+                top: `${Math.random() * 100}%`,
+              }}
+              animate={{
+                y: [0, -100, 0],
+                opacity: [0, 1, 0],
+              }}
+              transition={{
+                duration: 3 + Math.random() * 2,
+                repeat: Infinity,
+                delay: Math.random() * 2,
+              }}
+            />
+          ))}
+        </motion.div>
+        
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center z-30">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8 }}
             className="space-y-8"
+            style={{ y: ySpring2 }}
           >
-            <div className="inline-flex items-center space-x-2 bg-primary-100 dark:bg-primary-900/50 px-4 py-2 rounded-full text-primary-700 dark:text-primary-300 text-sm font-medium">
+            <motion.div 
+              className="inline-flex items-center space-x-2 bg-white/10 backdrop-blur-md px-4 py-2 rounded-full text-white text-sm font-medium border border-white/20"
+              whileHover={{ scale: 1.05 }}
+              transition={{ type: "spring", stiffness: 400, damping: 10 }}
+            >
               <Sparkles className="w-4 h-4" />
               <span>No-Code AI Agent Generator</span>
-            </div>
+            </motion.div>
 
-            <h1 className="text-4xl md:text-6xl lg:text-7xl font-bold text-gray-900 dark:text-white leading-tight">
+            <motion.h1 
+              className="text-4xl md:text-6xl lg:text-7xl font-bold text-white leading-tight"
+              initial={{ opacity: 0, y: 30 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 1, delay: 0.2 }}
+            >
               Create{' '}
-              <span className="bg-gradient-to-r from-primary-600 to-secondary-600 bg-clip-text text-transparent">
+              <motion.span 
+                className="bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent"
+                animate={{ 
+                  backgroundPosition: ['0% 50%', '100% 50%', '0% 50%'],
+                }}
+                transition={{ 
+                  duration: 3, 
+                  repeat: Infinity,
+                  ease: "linear"
+                }}
+                style={{
+                  backgroundSize: '200% 200%',
+                }}
+              >
                 Intelligent
-              </span>
+              </motion.span>
               <br />
               AI Agents in Minutes
-            </h1>
+            </motion.h1>
 
-            <p className="text-xl md:text-2xl text-gray-600 dark:text-gray-300 max-w-3xl mx-auto leading-relaxed">
+            <motion.p 
+              className="text-xl md:text-2xl text-gray-200 max-w-3xl mx-auto leading-relaxed"
+              initial={{ opacity: 0, y: 30 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 1, delay: 0.4 }}
+            >
               Build, customize, and deploy AI chatbots for your business without any coding. 
               From customer support to lead generation, create the perfect AI assistant.
-            </p>
+            </motion.p>
 
-            <div className="flex flex-col sm:flex-row items-center justify-center space-y-4 sm:space-y-0 sm:space-x-6">
+            <motion.div 
+              className="flex flex-col sm:flex-row items-center justify-center space-y-4 sm:space-y-0 sm:space-x-6"
+              initial={{ opacity: 0, y: 30 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 1, delay: 0.6 }}
+            >
               <Link to="/signup">
-                <Button size="lg" className="px-8 py-4 text-lg">
-                  Start Building Free
-                  <ArrowRight className="w-5 h-5 ml-2" />
-                </Button>
+                <motion.div
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                >
+                  <Button size="lg" className="px-8 py-4 text-lg bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 shadow-2xl">
+                    Start Building Free
+                    <ArrowRight className="w-5 h-5 ml-2" />
+                  </Button>
+                </motion.div>
               </Link>
-              <button className="flex items-center space-x-2 text-gray-600 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400 transition-colors">
-                <div className="w-12 h-12 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-full flex items-center justify-center shadow-lg">
+              <motion.button 
+                className="flex items-center space-x-2 text-white hover:text-blue-300 transition-colors"
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+              >
+                <motion.div 
+                  className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center shadow-lg border border-white/30"
+                  whileHover={{ backgroundColor: 'rgba(255, 255, 255, 0.3)' }}
+                >
                   <Play className="w-5 h-5 ml-1" />
-                </div>
+                </motion.div>
                 <span className="font-medium">Watch Demo</span>
-              </button>
-            </div>
+              </motion.button>
+            </motion.div>
 
-            <div className="pt-8">
-              <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">Trusted by 10,000+ businesses worldwide</p>
+            <motion.div 
+              className="pt-8"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 1, delay: 0.8 }}
+            >
+              <p className="text-sm text-gray-300 mb-4">Trusted by 10,000+ businesses worldwide</p>
               <div className="flex items-center justify-center space-x-8 opacity-60">
-                {/* Logo placeholders */}
-                <div className="w-24 h-8 bg-gray-300 dark:bg-gray-600 rounded" />
-                <div className="w-24 h-8 bg-gray-300 dark:bg-gray-600 rounded" />
-                <div className="w-24 h-8 bg-gray-300 dark:bg-gray-600 rounded" />
-                <div className="w-24 h-8 bg-gray-300 dark:bg-gray-600 rounded" />
+                {/* Logo placeholders with subtle animation */}
+                {[...Array(4)].map((_, i) => (
+                  <motion.div 
+                    key={i}
+                    className="w-24 h-8 bg-white/20 rounded backdrop-blur-sm"
+                    animate={{ opacity: [0.4, 0.8, 0.4] }}
+                    transition={{ 
+                      duration: 2, 
+                      repeat: Infinity, 
+                      delay: i * 0.5 
+                    }}
+                  />
+                ))}
               </div>
-            </div>
+            </motion.div>
           </motion.div>
         </div>
 
-        {/* Floating Animation */}
-        <motion.div
-          animate={{ y: [-20, 20, -20] }}
-          transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}
-          className="absolute right-8 top-1/2 transform -translate-y-1/2 hidden lg:block"
+        {/* Scroll Indicator */}
+        <motion.div 
+          className="absolute bottom-8 left-1/2 transform -translate-x-1/2 z-30"
+          animate={{ y: [0, 10, 0] }}
+          transition={{ duration: 2, repeat: Infinity }}
         >
-          <div className="w-64 h-80 bg-gradient-to-b from-white/80 to-white/40 dark:from-gray-800/80 dark:to-gray-800/40 backdrop-blur-md rounded-3xl shadow-2xl border border-gray-200/50 dark:border-gray-700/50 p-6">
-            <div className="flex items-center space-x-3 mb-4">
-              <div className="w-8 h-8 bg-gradient-to-r from-primary-500 to-secondary-500 rounded-full" />
-              <div className="space-y-1">
-                <div className="w-20 h-3 bg-gray-300 dark:bg-gray-600 rounded" />
-                <div className="w-16 h-2 bg-gray-200 dark:bg-gray-700 rounded" />
-              </div>
-            </div>
-            <div className="space-y-3">
-              <div className="bg-primary-100 dark:bg-primary-900/50 p-3 rounded-lg">
-                <div className="w-full h-2 bg-primary-300 dark:bg-primary-600 rounded mb-2" />
-                <div className="w-3/4 h-2 bg-primary-200 dark:bg-primary-700 rounded" />
-              </div>
-              <div className="bg-gray-100 dark:bg-gray-700 p-3 rounded-lg">
-                <div className="w-full h-2 bg-gray-300 dark:bg-gray-500 rounded mb-2" />
-                <div className="w-2/3 h-2 bg-gray-200 dark:bg-gray-600 rounded" />
-              </div>
-            </div>
+          <div className="w-6 h-10 border-2 border-white/50 rounded-full flex justify-center">
+            <motion.div 
+              className="w-1 h-3 bg-white/70 rounded-full mt-2"
+              animate={{ y: [0, 12, 0] }}
+              transition={{ duration: 2, repeat: Infinity }}
+            />
           </div>
         </motion.div>
       </section>
 
-      {/* Features Section */}
-      <section className="py-24 bg-gray-50 dark:bg-gray-800/50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      {/* Features Section with Parallax */}
+      <section className="py-24 bg-white dark:bg-gray-900 relative overflow-hidden">
+        <motion.div 
+          className="absolute inset-0 opacity-5"
+          style={{ y: ySpring1 }}
+        >
+          <div className="absolute top-20 left-10 w-72 h-72 bg-blue-500 rounded-full blur-3xl" />
+          <div className="absolute bottom-20 right-10 w-96 h-96 bg-purple-500 rounded-full blur-3xl" />
+        </motion.div>
+
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
@@ -213,11 +338,17 @@ export const Landing: React.FC = () => {
                 whileInView={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.5, delay: index * 0.1 }}
                 viewport={{ once: true }}
+                whileHover={{ y: -10 }}
+                style={{ y: index % 2 === 0 ? ySpring1 : ySpring2 }}
               >
-                <Card hover className="p-8 h-full">
-                  <div className="text-primary-600 dark:text-primary-400 mb-4">
+                <Card hover className="p-8 h-full bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50">
+                  <motion.div 
+                    className="text-primary-600 dark:text-primary-400 mb-4"
+                    whileHover={{ scale: 1.1, rotate: 5 }}
+                    transition={{ type: "spring", stiffness: 400, damping: 10 }}
+                  >
                     {feature.icon}
-                  </div>
+                  </motion.div>
                   <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-3">
                     {feature.title}
                   </h3>
@@ -231,9 +362,17 @@ export const Landing: React.FC = () => {
         </div>
       </section>
 
-      {/* How It Works */}
-      <section className="py-24">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      {/* How It Works with Scroll Animations */}
+      <section className="py-24 bg-gray-50 dark:bg-gray-800/50 relative overflow-hidden">
+        <motion.div 
+          className="absolute inset-0 opacity-10"
+          style={{ y: ySpring2 }}
+        >
+          <div className="absolute top-0 left-1/4 w-64 h-64 bg-green-500 rounded-full blur-3xl" />
+          <div className="absolute bottom-0 right-1/4 w-80 h-80 bg-blue-500 rounded-full blur-3xl" />
+        </motion.div>
+
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
@@ -260,12 +399,17 @@ export const Landing: React.FC = () => {
                 className={`flex flex-col lg:flex-row items-center space-y-8 lg:space-y-0 lg:space-x-12 ${
                   index % 2 === 1 ? 'lg:flex-row-reverse lg:space-x-reverse' : ''
                 }`}
+                style={{ y: index % 2 === 0 ? ySpring1 : ySpring3 }}
               >
                 <div className="flex-1">
                   <div className="inline-flex items-center space-x-3 mb-4">
-                    <div className="w-12 h-12 bg-gradient-to-r from-primary-600 to-secondary-600 rounded-full flex items-center justify-center text-white font-bold text-lg">
+                    <motion.div 
+                      className="w-12 h-12 bg-gradient-to-r from-primary-600 to-secondary-600 rounded-full flex items-center justify-center text-white font-bold text-lg shadow-lg"
+                      whileHover={{ scale: 1.1, rotate: 360 }}
+                      transition={{ duration: 0.5 }}
+                    >
                       {step.number}
-                    </div>
+                    </motion.div>
                     <h3 className="text-2xl font-bold text-gray-900 dark:text-white">
                       {step.title}
                     </h3>
@@ -274,20 +418,45 @@ export const Landing: React.FC = () => {
                     {step.description}
                   </p>
                 </div>
-                <div className="flex-1">
-                  <div className="w-full h-64 bg-gradient-to-br from-primary-100 to-secondary-100 dark:from-primary-900/20 dark:to-secondary-900/20 rounded-2xl flex items-center justify-center">
-                    <div className="text-4xl">{index === 0 ? '🎨' : index === 1 ? '🤖' : '🚀'}</div>
+                <motion.div 
+                  className="flex-1"
+                  whileHover={{ scale: 1.05 }}
+                  transition={{ type: "spring", stiffness: 300, damping: 20 }}
+                >
+                  <div className="w-full h-64 bg-gradient-to-br from-primary-100 to-secondary-100 dark:from-primary-900/20 dark:to-secondary-900/20 rounded-2xl flex items-center justify-center shadow-xl border border-gray-200/50 dark:border-gray-700/50 backdrop-blur-sm">
+                    <motion.div 
+                      className="text-6xl"
+                      animate={{ 
+                        rotate: [0, 10, -10, 0],
+                        scale: [1, 1.1, 1]
+                      }}
+                      transition={{ 
+                        duration: 4, 
+                        repeat: Infinity,
+                        ease: "easeInOut"
+                      }}
+                    >
+                      {index === 0 ? '🎨' : index === 1 ? '🤖' : '🚀'}
+                    </motion.div>
                   </div>
-                </div>
+                </motion.div>
               </motion.div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* Testimonials */}
-      <section className="py-24 bg-gray-50 dark:bg-gray-800/50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      {/* Testimonials with Parallax */}
+      <section className="py-24 bg-white dark:bg-gray-900 relative overflow-hidden">
+        <motion.div 
+          className="absolute inset-0 opacity-5"
+          style={{ y: ySpring3 }}
+        >
+          <div className="absolute top-10 right-10 w-96 h-96 bg-yellow-500 rounded-full blur-3xl" />
+          <div className="absolute bottom-10 left-10 w-72 h-72 bg-pink-500 rounded-full blur-3xl" />
+        </motion.div>
+
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
@@ -311,21 +480,32 @@ export const Landing: React.FC = () => {
                 whileInView={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.5, delay: index * 0.1 }}
                 viewport={{ once: true }}
+                whileHover={{ y: -10, scale: 1.02 }}
+                style={{ y: index % 2 === 0 ? ySpring1 : ySpring2 }}
               >
-                <Card className="p-8 h-full">
+                <Card className="p-8 h-full bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50">
                   <div className="flex items-center mb-4">
                     {[...Array(testimonial.rating)].map((_, i) => (
-                      <Star key={i} className="w-5 h-5 text-yellow-400 fill-current" />
+                      <motion.div
+                        key={i}
+                        initial={{ opacity: 0, scale: 0 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        transition={{ delay: i * 0.1 }}
+                      >
+                        <Star className="w-5 h-5 text-yellow-400 fill-current" />
+                      </motion.div>
                     ))}
                   </div>
                   <blockquote className="text-gray-600 dark:text-gray-300 mb-6 italic">
                     "{testimonial.content}"
                   </blockquote>
                   <div className="flex items-center">
-                    <img
+                    <motion.img
                       src={testimonial.avatar}
                       alt={testimonial.name}
                       className="w-12 h-12 rounded-full mr-4"
+                      whileHover={{ scale: 1.1 }}
+                      transition={{ type: "spring", stiffness: 400, damping: 10 }}
                     />
                     <div>
                       <div className="font-semibold text-gray-900 dark:text-white">
@@ -343,9 +523,17 @@ export const Landing: React.FC = () => {
         </div>
       </section>
 
-      {/* CTA Section */}
-      <section className="py-24 bg-gradient-to-r from-primary-600 to-secondary-600">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+      {/* CTA Section with Video Overlay Effect */}
+      <section className="py-24 bg-gradient-to-r from-primary-600 to-secondary-600 relative overflow-hidden">
+        <motion.div 
+          className="absolute inset-0 opacity-20"
+          style={{ y: ySpring2 }}
+        >
+          <div className="absolute inset-0 bg-black/20" />
+          <div className="w-full h-full bg-gradient-to-br from-blue-600/30 to-purple-600/30" />
+        </motion.div>
+
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center relative z-10">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
@@ -353,30 +541,72 @@ export const Landing: React.FC = () => {
             viewport={{ once: true }}
             className="space-y-8"
           >
-            <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold text-white">
+            <motion.h2 
+              className="text-3xl md:text-4xl lg:text-5xl font-bold text-white"
+              animate={{ 
+                textShadow: [
+                  "0 0 20px rgba(255,255,255,0.5)",
+                  "0 0 30px rgba(255,255,255,0.8)",
+                  "0 0 20px rgba(255,255,255,0.5)"
+                ]
+              }}
+              transition={{ duration: 2, repeat: Infinity }}
+            >
               Ready to Transform Your Business?
-            </h2>
+            </motion.h2>
             <p className="text-xl text-primary-100 max-w-2xl mx-auto">
               Join thousands of businesses already using AI agents to provide better customer experiences.
             </p>
-            <div className="flex flex-col sm:flex-row items-center justify-center space-y-4 sm:space-y-0 sm:space-x-6">
+            <motion.div 
+              className="flex flex-col sm:flex-row items-center justify-center space-y-4 sm:space-y-0 sm:space-x-6"
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.8, delay: 0.2 }}
+              viewport={{ once: true }}
+            >
               <Link to="/signup">
-                <Button 
-                  size="lg" 
-                  variant="outline"
-                  className="px-8 py-4 text-lg bg-white text-primary-600 border-white hover:bg-primary-50"
+                <motion.div
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
                 >
-                  Start Building Now
-                  <ArrowRight className="w-5 h-5 ml-2" />
-                </Button>
+                  <Button 
+                    size="lg" 
+                    variant="outline"
+                    className="px-8 py-4 text-lg bg-white text-primary-600 border-white hover:bg-primary-50 shadow-2xl"
+                  >
+                    Start Building Now
+                    <ArrowRight className="w-5 h-5 ml-2" />
+                  </Button>
+                </motion.div>
               </Link>
-              <div className="text-primary-100 text-sm">
+              <motion.div 
+                className="text-primary-100 text-sm flex items-center"
+                whileHover={{ scale: 1.05 }}
+              >
                 <Check className="w-4 h-4 inline mr-2" />
                 No credit card required
-              </div>
-            </div>
+              </motion.div>
+            </motion.div>
           </motion.div>
         </div>
+
+        {/* Floating Elements */}
+        <motion.div 
+          className="absolute top-10 left-10 w-20 h-20 bg-white/10 rounded-full"
+          animate={{ 
+            y: [0, -20, 0],
+            rotate: [0, 180, 360]
+          }}
+          transition={{ duration: 6, repeat: Infinity }}
+        />
+        <motion.div 
+          className="absolute bottom-10 right-10 w-16 h-16 bg-white/10 rounded-full"
+          animate={{ 
+            y: [0, 20, 0],
+            rotate: [360, 180, 0]
+          }}
+          transition={{ duration: 4, repeat: Infinity }}
+        />
       </section>
     </div>
   );
