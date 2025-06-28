@@ -161,14 +161,12 @@ export default {
         font-family: 'Inter', system-ui, sans-serif;
         background: transparent;
         overflow: hidden;
-        pointer-events: none;
       }
       
       #widget-root {
         width: 100%;
         height: 100%;
         position: relative;
-        pointer-events: none;
       }
     </style>
   </head>
@@ -516,7 +514,8 @@ function FloatingWidget() {
       left: 0, 
       width: '100vw', 
       height: '100vh', 
-      zIndex: 2147483647 
+      zIndex: 2147483647,
+      pointerEvents: 'none'
     }}>
       <FloatingButton onClick={() => setIsOpen(true)} />
       <ChatWidget 
