@@ -12,7 +12,7 @@ import { Dashboard } from './pages/Dashboard';
 import { NotFound } from './pages/NotFound';
 import { useThemeStore } from './store/themeStore';
 import { useAuthStore } from './store/authStore';
-import { supabase } from './lib/supabase';
+import { supabase, isSupabaseConfigured } from './lib/supabase';
 
 function App() {
   const { isDark } = useThemeStore();
@@ -28,6 +28,13 @@ function App() {
   }, [isDark]);
 
   useEffect(() => {
+    // Only initialize auth if Supabase is properly configured
+    if (!isSupabaseConfigured()) {
+      console.warn('Supabase not configured - running in demo mode');
+      setLoading(false);
+      return;
+    }
+
     // Get initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null);
@@ -56,6 +63,8 @@ function App() {
   }, [setUser, setLoading]);
 
   const ensureUserExists = async (user: any) => {
+    if (!isSupabaseConfigured()) return;
+    
     try {
       // Check if user exists in public.users table using limit(1) instead of single()
       const { data: existingUsers, error: checkError } = await supabase

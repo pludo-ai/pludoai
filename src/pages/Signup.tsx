@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Mail, Lock, User, Eye, EyeOff, Bot } from 'lucide-react';
+import { Mail, Lock, User, Eye, EyeOff, Bot, AlertCircle } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Card } from '../components/ui/Card';
-import { supabase } from '../lib/supabase';
+import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import toast from 'react-hot-toast';
 
 export const Signup: React.FC = () => {
@@ -22,6 +22,11 @@ export const Signup: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (!isSupabaseConfigured()) {
+      toast.error('Database not configured. Please set up Supabase connection.');
+      return;
+    }
     
     if (formData.password !== formData.confirmPassword) {
       toast.error('Passwords do not match');
@@ -92,6 +97,18 @@ export const Signup: React.FC = () => {
             </p>
           </div>
 
+          {/* Database Warning */}
+          {!isSupabaseConfigured() && (
+            <div className="mb-6 p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+              <div className="flex items-center">
+                <AlertCircle className="w-5 h-5 text-yellow-600 dark:text-yellow-400 mr-2" />
+                <div className="text-sm text-yellow-800 dark:text-yellow-200">
+                  <strong>Demo Mode:</strong> Database not configured. Registration is disabled.
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-6">
             <Input
@@ -103,6 +120,7 @@ export const Signup: React.FC = () => {
               placeholder="Enter your full name"
               icon={<User className="w-5 h-5 text-gray-400" />}
               required
+              disabled={!isSupabaseConfigured()}
             />
 
             <Input
@@ -114,6 +132,7 @@ export const Signup: React.FC = () => {
               placeholder="Enter your email"
               icon={<Mail className="w-5 h-5 text-gray-400" />}
               required
+              disabled={!isSupabaseConfigured()}
             />
 
             <div className="relative">
@@ -126,11 +145,13 @@ export const Signup: React.FC = () => {
                 placeholder="Create a strong password"
                 icon={<Lock className="w-5 h-5 text-gray-400" />}
                 required
+                disabled={!isSupabaseConfigured()}
               />
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
                 className="absolute right-3 top-8 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                disabled={!isSupabaseConfigured()}
               >
                 {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
               </button>
@@ -146,11 +167,13 @@ export const Signup: React.FC = () => {
                 placeholder="Confirm your password"
                 icon={<Lock className="w-5 h-5 text-gray-400" />}
                 required
+                disabled={!isSupabaseConfigured()}
               />
               <button
                 type="button"
                 onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                 className="absolute right-3 top-8 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                disabled={!isSupabaseConfigured()}
               >
                 {showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
               </button>
@@ -161,6 +184,7 @@ export const Signup: React.FC = () => {
                 type="checkbox"
                 className="w-4 h-4 text-primary-600 bg-gray-100 border-gray-300 rounded focus:ring-primary-500 dark:focus:ring-primary-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600 mt-1"
                 required
+                disabled={!isSupabaseConfigured()}
               />
               <span className="ml-2 text-sm text-gray-600 dark:text-gray-300">
                 I agree to the{' '}
@@ -179,8 +203,9 @@ export const Signup: React.FC = () => {
               className="w-full"
               size="lg"
               loading={loading}
+              disabled={!isSupabaseConfigured()}
             >
-              Create Account
+              {isSupabaseConfigured() ? 'Create Account' : 'Database Not Configured'}
             </Button>
           </form>
 
