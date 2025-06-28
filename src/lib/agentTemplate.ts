@@ -137,20 +137,31 @@ export default {
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>${config.name} - Floating Chat Widget</title>
+    <title>${config.name} - Chat Widget</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
-      body { 
-        margin: 0; 
-        padding: 0; 
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      
+      html, body {
+        width: 100%;
+        height: 100%;
         font-family: 'Inter', system-ui, sans-serif;
         background: transparent;
         overflow: hidden;
+        pointer-events: none;
       }
-      * {
-        box-sizing: border-box;
+      
+      #widget-root {
+        width: 100%;
+        height: 100%;
+        position: relative;
+        pointer-events: none;
       }
     </style>
   </head>
@@ -227,8 +238,8 @@ body {
       content: generateConfigFile(config)
     },
     {
-      path: 'public/float.js',
-      content: generateFloatScript(config)
+      path: 'public/widget.js',
+      content: generateWidgetScript(config)
     },
     {
       path: 'public/vite.svg',
@@ -264,8 +275,8 @@ ${config.knowledge || 'No additional information provided.'}`
         "framework": "vite",
         "rewrites": [
           {
-            "source": "/float.js",
-            "destination": "/float.js"
+            "source": "/widget.js",
+            "destination": "/widget.js"
           },
           {
             "source": "/widget",
@@ -444,7 +455,15 @@ function FloatingWidget() {
   const [isOpen, setIsOpen] = useState(false);
 
   return (
-    <div className="fixed inset-0 pointer-events-none z-[2147483647]" style={{ zIndex: 2147483647 }}>
+    <div style={{ 
+      position: 'fixed', 
+      top: 0, 
+      left: 0, 
+      width: '100vw', 
+      height: '100vh', 
+      pointerEvents: 'none', 
+      zIndex: 2147483647 
+    }}>
       <FloatingButton onClick={() => setIsOpen(true)} />
       <ChatWidget 
         isOpen={isOpen} 
@@ -553,7 +572,19 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({ isOpen, onClose, config 
 
   return (
     <AnimatePresence>
-      <div className="fixed inset-0 pointer-events-auto z-[2147483647] flex items-end justify-end p-4 md:items-center md:justify-center" style={{ zIndex: 2147483647 }}>
+      <div style={{ 
+        position: 'fixed', 
+        top: 0, 
+        left: 0, 
+        width: '100vw', 
+        height: '100vh', 
+        pointerEvents: 'auto', 
+        zIndex: 2147483647,
+        display: 'flex',
+        alignItems: 'flex-end',
+        justifyContent: 'flex-end',
+        padding: '16px'
+      }}>
         <motion.div
           initial={{ scale: 0.9, opacity: 0, y: 20 }}
           animate={{ 
@@ -563,27 +594,61 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({ isOpen, onClose, config 
             height: isMinimized ? 'auto' : '600px'
           }}
           exit={{ scale: 0.9, opacity: 0, y: 20 }}
-          className="bg-white rounded-2xl shadow-2xl w-full max-w-md flex flex-col overflow-hidden border border-gray-200"
-          style={{ maxHeight: '90vh' }}
+          style={{
+            backgroundColor: 'white',
+            borderRadius: '16px',
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+            width: '100%',
+            maxWidth: '400px',
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'hidden',
+            border: '1px solid #e5e7eb',
+            maxHeight: '90vh'
+          }}
         >
           {/* Header */}
-          <div className="flex items-center justify-between p-4 border-b border-gray-100 bg-gradient-to-r from-primary-50 to-primary-100">
-            <div className="flex items-center space-x-3">
-              ${config.avatarUrl ? `<img src="${config.avatarUrl}" alt="${config.name}" className="w-10 h-10 rounded-full" />` : `<div className="w-10 h-10 bg-gradient-to-r from-primary-500 to-primary-600 rounded-full flex items-center justify-center"><Bot className="w-6 h-6 text-white" /></div>`}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: '16px',
+            borderBottom: '1px solid #f3f4f6',
+            background: 'linear-gradient(to right, #f8fafc, #f1f5f9)'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              ${config.avatarUrl ? `<img src="${config.avatarUrl}" alt="${config.name}" style={{ width: '40px', height: '40px', borderRadius: '50%' }} />` : `<div style={{ width: '40px', height: '40px', background: 'linear-gradient(to right, #3b82f6, #1d4ed8)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Bot style={{ width: '24px', height: '24px', color: 'white' }} /></div>`}
               <div>
-                <h3 className="font-semibold text-gray-900">\${config.name}</h3>
-                <p className="text-sm text-gray-600">AI Assistant</p>
+                <h3 style={{ fontWeight: '600', color: '#111827', margin: 0, fontSize: '14px' }}>\${config.name}</h3>
+                <p style={{ fontSize: '12px', color: '#6b7280', margin: 0 }}>AI Assistant</p>
               </div>
             </div>
-            <div className="flex items-center space-x-2">
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <button 
                 onClick={() => setIsMinimized(!isMinimized)}
-                className="text-gray-400 hover:text-gray-600 p-1"
+                style={{ 
+                  background: 'none', 
+                  border: 'none', 
+                  color: '#9ca3af', 
+                  cursor: 'pointer', 
+                  padding: '4px',
+                  borderRadius: '4px'
+                }}
               >
-                <Minimize2 className="w-4 h-4" />
+                <Minimize2 style={{ width: '16px', height: '16px' }} />
               </button>
-              <button onClick={onClose} className="text-gray-400 hover:text-gray-600 p-1">
-                <X className="w-4 h-4" />
+              <button 
+                onClick={onClose} 
+                style={{ 
+                  background: 'none', 
+                  border: 'none', 
+                  color: '#9ca3af', 
+                  cursor: 'pointer', 
+                  padding: '4px',
+                  borderRadius: '4px'
+                }}
+              >
+                <X style={{ width: '16px', height: '16px' }} />
               </button>
             </div>
           </div>
@@ -591,30 +656,63 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({ isOpen, onClose, config 
           {!isMinimized && (
             <>
               {/* Messages */}
-              <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50">
+              <div style={{
+                flex: 1,
+                overflowY: 'auto',
+                padding: '16px',
+                backgroundColor: '#f9fafb',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '16px'
+              }}>
                 {messages.map((message) => (
                   <motion.div
                     key={message.id}
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
-                    className={\`flex \${message.isUser ? 'justify-end' : 'justify-start'}\`}
+                    style={{
+                      display: 'flex',
+                      justifyContent: message.isUser ? 'flex-end' : 'flex-start'
+                    }}
                   >
-                    <div className={\`flex items-start space-x-2 max-w-xs \${message.isUser ? 'flex-row-reverse space-x-reverse' : ''}\`}>
-                      <div className={\`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 \${message.isUser ? 'bg-primary-600' : 'bg-gray-300'}\`}>
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'flex-start',
+                      gap: '8px',
+                      maxWidth: '75%',
+                      flexDirection: message.isUser ? 'row-reverse' : 'row'
+                    }}>
+                      <div style={{
+                        width: '32px',
+                        height: '32px',
+                        borderRadius: '50%',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        flexShrink: 0,
+                        backgroundColor: message.isUser ? '#3b82f6' : '#d1d5db'
+                      }}>
                         {message.isUser ? (
-                          <User className="w-4 h-4 text-white" />
+                          <User style={{ width: '16px', height: '16px', color: 'white' }} />
                         ) : (
-                          <Bot className="w-4 h-4 text-gray-600" />
+                          <Bot style={{ width: '16px', height: '16px', color: '#6b7280' }} />
                         )}
                       </div>
                       <div
-                        className={\`px-4 py-2 rounded-2xl \${
-                          message.isUser
-                            ? 'bg-primary-600 text-white rounded-br-md'
-                            : 'bg-white text-gray-900 rounded-bl-md shadow-sm border border-gray-200'
-                        }\`}
+                        style={{
+                          padding: '12px 16px',
+                          borderRadius: '16px',
+                          backgroundColor: message.isUser ? '#3b82f6' : 'white',
+                          color: message.isUser ? 'white' : '#111827',
+                          fontSize: '14px',
+                          lineHeight: '1.4',
+                          boxShadow: message.isUser ? 'none' : '0 1px 3px rgba(0, 0, 0, 0.1)',
+                          border: message.isUser ? 'none' : '1px solid #e5e7eb',
+                          borderBottomLeftRadius: message.isUser ? '16px' : '4px',
+                          borderBottomRightRadius: message.isUser ? '4px' : '16px'
+                        }}
                       >
-                        <p className="text-sm whitespace-pre-wrap">{message.text}</p>
+                        {message.text}
                       </div>
                     </div>
                   </motion.div>
@@ -623,17 +721,32 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({ isOpen, onClose, config 
                   <motion.div
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
-                    className="flex justify-start"
+                    style={{ display: 'flex', justifyContent: 'flex-start' }}
                   >
-                    <div className="flex items-start space-x-2 max-w-xs">
-                      <div className="w-8 h-8 rounded-full bg-gray-300 flex items-center justify-center">
-                        <Bot className="w-4 h-4 text-gray-600" />
+                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', maxWidth: '75%' }}>
+                      <div style={{
+                        width: '32px',
+                        height: '32px',
+                        backgroundColor: '#d1d5db',
+                        borderRadius: '50%',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center'
+                      }}>
+                        <Bot style={{ width: '16px', height: '16px', color: '#6b7280' }} />
                       </div>
-                      <div className="bg-white px-4 py-2 rounded-2xl rounded-bl-md shadow-sm border border-gray-200">
-                        <div className="flex space-x-1">
-                          <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
-                          <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                          <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                      <div style={{
+                        backgroundColor: 'white',
+                        padding: '12px 16px',
+                        borderRadius: '16px',
+                        borderBottomLeftRadius: '4px',
+                        boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
+                        border: '1px solid #e5e7eb'
+                      }}>
+                        <div style={{ display: 'flex', gap: '4px' }}>
+                          <div style={{ width: '8px', height: '8px', backgroundColor: '#9ca3af', borderRadius: '50%', animation: 'bounce 1.4s infinite' }}></div>
+                          <div style={{ width: '8px', height: '8px', backgroundColor: '#9ca3af', borderRadius: '50%', animation: 'bounce 1.4s infinite 0.2s' }}></div>
+                          <div style={{ width: '8px', height: '8px', backgroundColor: '#9ca3af', borderRadius: '50%', animation: 'bounce 1.4s infinite 0.4s' }}></div>
                         </div>
                       </div>
                     </div>
@@ -643,8 +756,12 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({ isOpen, onClose, config 
               </div>
 
               {/* Input */}
-              <div className="p-4 border-t border-gray-100 bg-white">
-                <div className="flex space-x-2">
+              <div style={{
+                padding: '16px',
+                borderTop: '1px solid #f3f4f6',
+                backgroundColor: 'white'
+              }}>
+                <div style={{ display: 'flex', gap: '8px' }}>
                   <input
                     ref={inputRef}
                     type="text"
@@ -652,15 +769,35 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({ isOpen, onClose, config 
                     onChange={(e) => setInputValue(e.target.value)}
                     onKeyPress={handleKeyPress}
                     placeholder="Type your message..."
-                    className="flex-1 border border-gray-300 rounded-full px-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                     disabled={isLoading}
+                    style={{
+                      flex: 1,
+                      border: '1px solid #d1d5db',
+                      borderRadius: '24px',
+                      padding: '8px 16px',
+                      fontSize: '14px',
+                      outline: 'none',
+                      backgroundColor: 'white'
+                    }}
                   />
                   <button
                     onClick={handleSend}
                     disabled={!inputValue.trim() || isLoading}
-                    className="bg-primary-600 text-white p-2 rounded-full hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    style={{
+                      backgroundColor: '#3b82f6',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '50%',
+                      width: '40px',
+                      height: '40px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      cursor: inputValue.trim() && !isLoading ? 'pointer' : 'not-allowed',
+                      opacity: inputValue.trim() && !isLoading ? 1 : 0.5
+                    }}
                   >
-                    <Send className="w-4 h-4" />
+                    <Send style={{ width: '16px', height: '16px' }} />
                   </button>
                 </div>
               </div>
@@ -686,9 +823,6 @@ export const FloatingButton: React.FC<FloatingButtonProps> = ({ onClick }) => {
   return (
     <motion.button
       onClick={onClick}
-      className="fixed bottom-6 right-6 w-14 h-14 bg-gradient-to-r from-primary-600 to-primary-700 text-white rounded-full shadow-2xl hover:shadow-3xl z-[2147483647] flex items-center justify-center pointer-events-auto"
-      whileHover={{ scale: 1.1 }}
-      whileTap={{ scale: 0.9 }}
       initial={{ scale: 0 }}
       animate={{ scale: 1 }}
       transition={{ 
@@ -697,7 +831,26 @@ export const FloatingButton: React.FC<FloatingButtonProps> = ({ onClick }) => {
         damping: 20,
         delay: 1
       }}
-      style={{ zIndex: 2147483647 }}
+      style={{
+        position: 'fixed',
+        bottom: '24px',
+        right: '24px',
+        width: '56px',
+        height: '56px',
+        background: 'linear-gradient(to right, #3b82f6, #1d4ed8)',
+        color: 'white',
+        borderRadius: '50%',
+        border: 'none',
+        cursor: 'pointer',
+        boxShadow: '0 10px 25px rgba(0, 0, 0, 0.2)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 2147483647,
+        pointerEvents: 'auto'
+      }}
+      whileHover={{ scale: 1.1 }}
+      whileTap={{ scale: 0.9 }}
     >
       <motion.div
         animate={{ rotate: [0, 10, -10, 0] }}
@@ -708,14 +861,19 @@ export const FloatingButton: React.FC<FloatingButtonProps> = ({ onClick }) => {
           delay: 2
         }}
       >
-        ${config.avatarUrl ? `<img src="${config.avatarUrl}" alt="${config.name}" className="w-8 h-8 rounded-full" />` : `<Bot className="w-6 h-6" />`}
+        ${config.avatarUrl ? `<img src="${config.avatarUrl}" alt="${config.name}" style={{ width: '32px', height: '32px', borderRadius: '50%' }} />` : `<Bot style={{ width: '24px', height: '24px' }} />`}
       </motion.div>
       
       {/* Pulse animation */}
       <motion.div
-        className="absolute inset-0 rounded-full bg-primary-600"
         animate={{ scale: [1, 1.2, 1], opacity: [0.7, 0, 0.7] }}
         transition={{ duration: 2, repeat: Infinity }}
+        style={{
+          position: 'absolute',
+          inset: 0,
+          borderRadius: '50%',
+          backgroundColor: '#3b82f6'
+        }}
       />
     </motion.button>
   );
@@ -838,7 +996,7 @@ function generateConfigFile(config: AgentConfig): string {
 export default agentConfig;`;
 }
 
-function generateFloatScript(config: AgentConfig): string {
+function generateWidgetScript(config: AgentConfig): string {
   return `(function() {
   'use strict';
   
@@ -856,8 +1014,8 @@ function generateFloatScript(config: AgentConfig): string {
     iframe.src = window.location.origin + '/widget.html';
     iframe.style.cssText = \`
       position: fixed !important;
-      bottom: 0 !important;
-      right: 0 !important;
+      top: 0 !important;
+      left: 0 !important;
       width: 100vw !important;
       height: 100vh !important;
       border: none !important;
@@ -910,7 +1068,7 @@ This AI assistant is ready to deploy and can be embedded on any website.
 Add this script tag to your website:
 
 \`\`\`html
-<script src="https://your-domain.vercel.app/float.js" defer></script>
+<script src="https://your-domain.vercel.app/widget.js" defer></script>
 \`\`\`
 
 ### Local Development
