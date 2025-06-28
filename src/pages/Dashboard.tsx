@@ -447,9 +447,9 @@ export const Dashboard: React.FC = () => {
                         </h4>
                         <ol className="text-sm text-blue-800 dark:text-blue-300 space-y-1 list-decimal list-inside">
                           <li>Copy the embed code above</li>
-                          <li>Paste it into your website's HTML, preferably before the closing </body> tag</li>
+                          <li>Paste it into your website&apos;s HTML, preferably before the closing body tag</li>
                           <li>Your AI agent will appear as a floating chat button</li>
-                          <li>Test it on your website to ensure it's working correctly</li>
+                          <li>Test it on your website to ensure it&apos;s working correctly</li>
                         </ol>
                       </div>
                     </>
