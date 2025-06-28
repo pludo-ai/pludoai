@@ -65,7 +65,7 @@ export default {
           800: '#1f2937',
           900: '#111827',
         },
-        // Custom colors for the new design
+        // Premium brand colors
         'brand-gold': '#FFD700',
         'brand-light-gold': '#FFEC8A',
         'brand-dark': '#0A0A0A',
@@ -74,8 +74,6 @@ export default {
       },
       fontFamily: {
         sans: ['Inter', 'system-ui', 'sans-serif'],
-        // Add a premium serif font for headings if desired
-        // serif: ['Playfair Display', 'serif'], 
       },
       animation: {
         'glow': 'glow 2s ease-in-out infinite alternate',
@@ -85,9 +83,12 @@ export default {
         'pulse-slow': 'pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite',
         'shimmer': 'shimmer 2s linear infinite',
         'bounce-slow': 'bounce 3s infinite',
-        // New animations
-        'text-shimmer': 'text-shimmer 2.5s ease-out infinite alternate',
-        'background-pan': 'background-pan 15s ease-in-out infinite alternate',
+        'text-shimmer': 'text-shimmer 3s ease-in-out infinite',
+        'background-pan': 'background-pan 20s ease-in-out infinite alternate',
+        'fade-in': 'fade-in 0.8s ease-out forwards',
+        'slide-up': 'slide-up 0.8s ease-out forwards',
+        'scale-in': 'scale-in 0.6s ease-out forwards',
+        'rotate-slow': 'rotate-slow 20s linear infinite',
       },
       keyframes: {
         glow: {
@@ -106,27 +107,46 @@ export default {
           '0%': { transform: 'translateX(-100%)' },
           '100%': { transform: 'translateX(100%)' },
         },
-        // New keyframes
         'text-shimmer': {
-          'from': { backgroundPosition: '200% center' },
-          'to': { backgroundPosition: '-200% center' },
+          '0%': { backgroundPosition: '200% center' },
+          '50%': { backgroundPosition: '0% center' },
+          '100%': { backgroundPosition: '-200% center' },
         },
         'background-pan': {
           '0%': { backgroundPosition: '0% 0%' },
           '100%': { backgroundPosition: '100% 100%' },
-        }
+        },
+        'fade-in': {
+          '0%': { opacity: '0', transform: 'translateY(20px)' },
+          '100%': { opacity: '1', transform: 'translateY(0)' },
+        },
+        'slide-up': {
+          '0%': { opacity: '0', transform: 'translateY(60px)' },
+          '100%': { opacity: '1', transform: 'translateY(0)' },
+        },
+        'scale-in': {
+          '0%': { opacity: '0', transform: 'scale(0.9)' },
+          '100%': { opacity: '1', transform: 'scale(1)' },
+        },
+        'rotate-slow': {
+          '0%': { transform: 'rotate(0deg)' },
+          '100%': { transform: 'rotate(360deg)' },
+        },
       },
       backdropBlur: {
         xs: '2px',
         '2xl': '40px',
+        '3xl': '64px',
       },
       backgroundSize: {
         '200%': '200%',
         '300%': '300%',
+        '400%': '400%',
       },
       perspective: {
         '1000': '1000px',
         '2000': '2000px',
+        '3000': '3000px',
       },
       transformStyle: {
         'preserve-3d': 'preserve-3d',
@@ -134,7 +154,53 @@ export default {
       clipPath: {
         'inset-0': 'inset(0% 0 0 0)',
         'inset-100': 'inset(100% 0 0 0)',
-      }
+      },
+      spacing: {
+        '18': '4.5rem',
+        '88': '22rem',
+        '128': '32rem',
+      },
+      fontSize: {
+        '10xl': '10rem',
+        '11xl': '12rem',
+        '12xl': '14rem',
+      },
+      lineHeight: {
+        '12': '3rem',
+        '14': '3.5rem',
+        '16': '4rem',
+      },
+      zIndex: {
+        '60': '60',
+        '70': '70',
+        '80': '80',
+        '90': '90',
+        '100': '100',
+      },
+      blur: {
+        '4xl': '72px',
+        '5xl': '96px',
+      },
+      scale: {
+        '102': '1.02',
+        '103': '1.03',
+        '104': '1.04',
+        '105': '1.05',
+      },
+      transitionDuration: {
+        '400': '400ms',
+        '600': '600ms',
+        '800': '800ms',
+        '900': '900ms',
+        '1200': '1200ms',
+        '1500': '1500ms',
+        '2000': '2000ms',
+      },
+      transitionTimingFunction: {
+        'bounce-in': 'cubic-bezier(0.68, -0.55, 0.265, 1.55)',
+        'smooth': 'cubic-bezier(0.4, 0, 0.2, 1)',
+        'elastic': 'cubic-bezier(0.68, -0.55, 0.265, 1.55)',
+      },
     },
   },
   plugins: [],
