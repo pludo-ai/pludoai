@@ -1098,9 +1098,48 @@ function generateWidgetScript(config: AgentConfig, vercelUrl?: string): string {
       height: 100vh !important;
       border: none !important;
       z-index: 2147483647 !important;
-      pointer-events: none !important;
+      pointer-events: auto !important;
       background: transparent !important;
     \`;
+    // Add event listener to handle pointer events intelligently
+    iframe.addEventListener('load', function() {
+      try {
+        // Try to access iframe content to set up pointer events
+        const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+        if (iframeDoc) {
+          // Add CSS to ensure the floating button is always clickable
+          const style = iframeDoc.createElement('style');
+          style.textContent = `
+            #widget-root {
+              position: relative;
+              z-index: 2147483647;
+            }
+            #widget-root * {
+              box-sizing: border-box;
+            }
+            /* Ensure floating button container is always clickable */
+            #widget-root > div:first-child {
+              pointer-events: auto !important;
+              cursor: pointer !important;
+            }
+            /* Make sure the button itself is clickable */
+            #widget-root button, #widget-root [style*="cursor: pointer"] {
+              pointer-events: auto !important;
+              cursor: pointer !important;
+            }
+            /* Ensure proper stacking context */
+            #widget-root > div {
+              position: relative;
+              z-index: 2147483647;
+            }
+          `;
+          iframeDoc.head.appendChild(style);
+        }
+      } catch (e) {
+        // Cross-origin restrictions might prevent this
+        console.log('Widget iframe loaded (cross-origin restrictions may apply)');
+      }
+    });
 
     return iframe;
   }
