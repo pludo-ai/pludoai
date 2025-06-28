@@ -1,3 +1,4 @@
+```typescript
 interface AgentConfig {
   name: string;
   brandName: string;
@@ -9,6 +10,7 @@ interface AgentConfig {
   primaryColor: string;
   tone: string;
   avatarUrl?: string;
+  subdomain: string;
   officeHours?: string;
   knowledge: string;
 }
@@ -58,7 +60,7 @@ export default defineConfig({
     rollupOptions: {
       input: {
         main: 'index.html',
-        float: 'float.html'
+        widget: 'widget.html'
       }
     }
   },
@@ -68,7 +70,7 @@ export default defineConfig({
       path: 'tailwind.config.js',
       content: `/** @type {import('tailwindcss').Config} */
 export default {
-  content: ['./index.html', './float.html', './src/**/*.{js,ts,jsx,tsx}'],
+  content: ['./index.html', './widget.html', './src/**/*.{js,ts,jsx,tsx}'],
   darkMode: 'class',
   theme: {
     extend: {
@@ -130,25 +132,32 @@ export default {
 </html>`
     },
     {
-      path: 'float.html',
+      path: 'widget.html',
       content: `<!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>${config.name} - Floating Chat Widget</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
       body { 
         margin: 0; 
         padding: 0; 
         font-family: 'Inter', system-ui, sans-serif;
         background: transparent;
+        overflow: hidden;
+      }
+      * {
+        box-sizing: border-box;
       }
     </style>
   </head>
   <body>
-    <div id="float-root"></div>
-    <script type="module" src="/src/float.tsx"></script>
+    <div id="widget-root"></div>
+    <script type="module" src="/src/widget.tsx"></script>
   </body>
 </html>`
     },
@@ -166,13 +175,13 @@ createRoot(document.getElementById('root')!).render(
 );`
     },
     {
-      path: 'src/float.tsx',
+      path: 'src/widget.tsx',
       content: `import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import FloatingWidget from './FloatingWidget.tsx';
 import './index.css';
 
-createRoot(document.getElementById('float-root')!).render(
+createRoot(document.getElementById('widget-root')!).render(
   <StrictMode>
     <FloatingWidget />
   </StrictMode>
@@ -261,7 +270,11 @@ ${config.knowledge || 'No additional information provided.'}`
           },
           {
             "source": "/widget",
-            "destination": "/float.html"
+            "destination": "/widget.html"
+          },
+          {
+            "source": "/widget.html",
+            "destination": "/widget.html"
           },
           {
             "source": "/(.*)",
@@ -432,7 +445,7 @@ function FloatingWidget() {
   const [isOpen, setIsOpen] = useState(false);
 
   return (
-    <div className="fixed inset-0 pointer-events-none z-50">
+    <div className="fixed inset-0 pointer-events-none z-[2147483647]" style={{ zIndex: 2147483647 }}>
       <FloatingButton onClick={() => setIsOpen(true)} />
       <ChatWidget 
         isOpen={isOpen} 
@@ -541,7 +554,7 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({ isOpen, onClose, config 
 
   return (
     <AnimatePresence>
-      <div className="fixed inset-0 pointer-events-auto z-50 flex items-end justify-end p-4 md:items-center md:justify-center">
+      <div className="fixed inset-0 pointer-events-auto z-[2147483647] flex items-end justify-end p-4 md:items-center md:justify-center" style={{ zIndex: 2147483647 }}>
         <motion.div
           initial={{ scale: 0.9, opacity: 0, y: 20 }}
           animate={{ 
@@ -674,7 +687,7 @@ export const FloatingButton: React.FC<FloatingButtonProps> = ({ onClick }) => {
   return (
     <motion.button
       onClick={onClick}
-      className="fixed bottom-6 right-6 w-14 h-14 bg-gradient-to-r from-primary-600 to-primary-700 text-white rounded-full shadow-2xl hover:shadow-3xl z-50 flex items-center justify-center pointer-events-auto"
+      className="fixed bottom-6 right-6 w-14 h-14 bg-gradient-to-r from-primary-600 to-primary-700 text-white rounded-full shadow-2xl hover:shadow-3xl z-[2147483647] flex items-center justify-center pointer-events-auto"
       whileHover={{ scale: 1.1 }}
       whileTap={{ scale: 0.9 }}
       initial={{ scale: 0 }}
@@ -685,6 +698,7 @@ export const FloatingButton: React.FC<FloatingButtonProps> = ({ onClick }) => {
         damping: 20,
         delay: 1
       }}
+      style={{ zIndex: 2147483647 }}
     >
       <motion.div
         animate={{ rotate: [0, 10, -10, 0] }}
@@ -840,7 +854,7 @@ function generateFloatScript(config: AgentConfig): string {
   function createFloatingWidget() {
     const iframe = document.createElement('iframe');
     iframe.id = 'pludo-ai-widget';
-    iframe.src = window.location.origin + '/widget';
+    iframe.src = window.location.origin + '/widget.html';
     iframe.style.cssText = \`
       position: fixed !important;
       bottom: 0 !important;
@@ -981,3 +995,4 @@ function hexToHsl(hex: string, lightness: number): string {
   // Convert to HSL string with custom lightness
   return `hsl(${Math.round(h * 360)}, ${Math.round(s * 100)}%, ${lightness}%)`;
 }
+```
