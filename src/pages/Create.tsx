@@ -18,14 +18,15 @@ import {
   Copy,
   Download,
   Github,
-  Globe
+  Globe,
+  Zap
 } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Textarea } from '../components/ui/Textarea';
 import { Card } from '../components/ui/Card';
 import { useAuthStore } from '../store/authStore';
-import { generateAgentCode, uploadToGitHub, deployToVercel } from '../lib/deployment';
+import { generateAgentCode, uploadToGitHub, deployToVercel, triggerDeploymentWithFile } from '../lib/deployment';
 import toast from 'react-hot-toast';
 
 interface FAQ {
@@ -76,6 +77,14 @@ export const Create: React.FC = () => {
   const [deploymentResult, setDeploymentResult] = useState<any>(null);
   const [isDeploying, setIsDeploying] = useState(false);
   const [showDeployment, setShowDeployment] = useState(false);
+  
+  // Button states
+  const [buttonStates, setButtonStates] = useState({
+    generateCode: false,
+    uploadGithub: false,
+    deployVercel: false,
+    makeItLive: false,
+  });
 
   // Auto-generate subdomain from brand name
   useEffect(() => {
@@ -145,6 +154,10 @@ export const Create: React.FC = () => {
     ]);
   };
 
+  const setButtonLoading = (button: keyof typeof buttonStates, loading: boolean) => {
+    setButtonStates(prev => ({ ...prev, [button]: loading }));
+  };
+
   const validateForm = () => {
     if (!formData.name.trim()) {
       toast.error('Agent name is required');
@@ -173,6 +186,7 @@ export const Create: React.FC = () => {
     }
 
     setIsDeploying(true);
+    setButtonLoading('generateCode', true);
     setShowDeployment(true);
     resetDeploymentSteps();
 
@@ -202,6 +216,7 @@ export const Create: React.FC = () => {
       toast.error('Failed to generate agent code');
     } finally {
       setIsDeploying(false);
+      setButtonLoading('generateCode', false);
     }
   };
 
@@ -212,6 +227,7 @@ export const Create: React.FC = () => {
     }
 
     setIsDeploying(true);
+    setButtonLoading('uploadGithub', true);
 
     try {
       updateDeploymentStep('step-2', 'loading', 'Creating GitHub repository...');
@@ -231,6 +247,7 @@ export const Create: React.FC = () => {
       toast.error('Failed to upload to GitHub');
     } finally {
       setIsDeploying(false);
+      setButtonLoading('uploadGithub', false);
     }
   };
 
@@ -241,6 +258,7 @@ export const Create: React.FC = () => {
     }
 
     setIsDeploying(true);
+    setButtonLoading('deployVercel', true);
 
     try {
       updateDeploymentStep('step-3', 'loading', 'Deploying to Vercel...');
@@ -260,6 +278,37 @@ export const Create: React.FC = () => {
       toast.error('Failed to deploy to Vercel');
     } finally {
       setIsDeploying(false);
+      setButtonLoading('deployVercel', false);
+    }
+  };
+
+  const handleMakeItLive = async () => {
+    if (!currentAgentId) {
+      toast.error('Please complete the deployment process first');
+      return;
+    }
+
+    setButtonLoading('makeItLive', true);
+
+    try {
+      toast.loading('Triggering production deployment...', { id: 'make-live' });
+
+      const result = await triggerDeploymentWithFile(currentAgentId);
+
+      if (result.success) {
+        toast.success('Production deployment triggered! Your agent will be live shortly.', { id: 'make-live' });
+        
+        // Update deployment result if needed
+        if (result.vercelUrl) {
+          setDeploymentResult(prev => ({ ...prev, ...result }));
+        }
+      } else {
+        toast.error(result.error || 'Failed to trigger deployment', { id: 'make-live' });
+      }
+    } catch (error: any) {
+      toast.error('Failed to trigger deployment', { id: 'make-live' });
+    } finally {
+      setButtonLoading('makeItLive', false);
     }
   };
 
@@ -280,6 +329,12 @@ export const Create: React.FC = () => {
         return <div className="w-5 h-5 border-2 border-gray-300 rounded-full" />;
     }
   };
+
+  // Check if buttons should be disabled
+  const isGenerateCodeDisabled = buttonStates.generateCode || isDeploying;
+  const isUploadGithubDisabled = buttonStates.uploadGithub || isDeploying || deploymentSteps[0]?.status !== 'success';
+  const isDeployVercelDisabled = buttonStates.deployVercel || isDeploying || deploymentSteps[1]?.status !== 'success';
+  const isMakeItLiveDisabled = buttonStates.makeItLive || !deploymentResult?.githubRepo;
 
   if (!user) {
     return (
@@ -648,38 +703,47 @@ export const Create: React.FC = () => {
                   <div className="space-y-3">
                     <Button
                       onClick={handleGenerateCode}
-                      disabled={isDeploying}
+                      disabled={isGenerateCodeDisabled}
                       className="w-full"
-                      loading={deploymentSteps[0]?.status === 'loading'}
+                      loading={buttonStates.generateCode}
                     >
                       <Code className="w-4 h-4 mr-2" />
                       Generate Agent Code
                     </Button>
 
-                    {currentAgentId && (
-                      <>
-                        <Button
-                          onClick={handleUploadToGitHub}
-                          disabled={isDeploying || deploymentSteps[0]?.status !== 'success'}
-                          variant="outline"
-                          className="w-full"
-                          loading={deploymentSteps[1]?.status === 'loading'}
-                        >
-                          <Github className="w-4 h-4 mr-2" />
-                          Upload to GitHub
-                        </Button>
+                    <Button
+                      onClick={handleUploadToGitHub}
+                      disabled={isUploadGithubDisabled}
+                      variant="outline"
+                      className="w-full"
+                      loading={buttonStates.uploadGithub}
+                    >
+                      <Github className="w-4 h-4 mr-2" />
+                      Upload to GitHub
+                    </Button>
 
-                        <Button
-                          onClick={handleDeployToVercel}
-                          disabled={isDeploying || deploymentSteps[1]?.status !== 'success'}
-                          variant="secondary"
-                          className="w-full"
-                          loading={deploymentSteps[2]?.status === 'loading'}
-                        >
-                          <Rocket className="w-4 h-4 mr-2" />
-                          Deploy to Vercel
-                        </Button>
-                      </>
+                    <Button
+                      onClick={handleDeployToVercel}
+                      disabled={isDeployVercelDisabled}
+                      variant="secondary"
+                      className="w-full"
+                      loading={buttonStates.deployVercel}
+                    >
+                      <Rocket className="w-4 h-4 mr-2" />
+                      Deploy to Vercel
+                    </Button>
+
+                    {/* Make it Live Button */}
+                    {deploymentResult?.githubRepo && (
+                      <Button
+                        onClick={handleMakeItLive}
+                        disabled={isMakeItLiveDisabled}
+                        className="w-full bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white"
+                        loading={buttonStates.makeItLive}
+                      >
+                        <Zap className="w-4 h-4 mr-2" />
+                        Make it Live
+                      </Button>
                     )}
                   </div>
                 </Card>

@@ -86,7 +86,7 @@ class GitHubService {
       body: JSON.stringify({
         name: validName,
         description: description.substring(0, 350), // GitHub limit
-        private: false, // Changed to public to avoid permission issues
+        private: true, // Changed back to private
         auto_init: true, // Initialize with README to avoid empty repo issues
         has_issues: false,
         has_projects: false,
