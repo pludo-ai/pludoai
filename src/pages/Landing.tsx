@@ -11,637 +11,316 @@ import {
   ArrowRight, 
   Check, 
   Star,
-  Play,
   Sparkles,
   Code,
   Palette,
   MessageSquare,
-  ChevronDown
+  ChevronDown,
+  Brain,
+  Rocket,
+  Users,
+  Award,
+  TrendingUp,
+  Clock,
+  Target,
+  Layers
 } from 'lucide-react';
-import { Button } from '../components/ui/Button';
-import { Card } from '../components/ui/Card';
+import { Button } from '../components/ui/Button'; // Assuming you have these components
+import { Card } from '../components/ui/Card';     // Assuming you have these components
 
 // Register GSAP plugins
 gsap.registerPlugin(ScrollTrigger, TextPlugin);
 
+// Custom Cursor Component
+const CustomCursor: React.FC = () => {
+  const cursorRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const onMouseMove = (e: MouseEvent) => {
+      gsap.to(cursorRef.current, {
+        x: e.clientX,
+        y: e.clientY,
+        duration: 0.3,
+        ease: 'power3.out'
+      });
+    };
+    window.addEventListener('mousemove', onMouseMove);
+    return () => window.removeEventListener('mousemove', onMouseMove);
+  }, []);
+
+  return (
+    <div 
+      ref={cursorRef} 
+      className="fixed hidden lg:block w-4 h-4 bg-brand-gold rounded-full pointer-events-none z-50 mix-blend-difference"
+    />
+  );
+};
+
 export const Landing: React.FC = () => {
-  const heroRef = useRef<HTMLDivElement>(null);
-  const videoRef = useRef<HTMLDivElement>(null);
-  const videoElementRef = useRef<HTMLVideoElement>(null);
-  const featuresRef = useRef<HTMLDivElement>(null);
-  const stepsRef = useRef<HTMLDivElement>(null);
-  const testimonialsRef = useRef<HTMLDivElement>(null);
-  const ctaRef = useRef<HTMLDivElement>(null);
-  const titleRef = useRef<HTMLHeadingElement>(null);
-  const subtitleRef = useRef<HTMLParagraphElement>(null);
-  const scrollIndicatorRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const horizontalGalleryRef = useRef<HTMLDivElement>(null);
+  const galleryPinRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const ctx = gsap.context(() => {
-      // Hero section animations
-      const tl = gsap.timeline();
-      
-      // Animated title with typewriter effect
-      tl.from(titleRef.current, {
-        opacity: 0,
-        y: 100,
-        duration: 1.2,
-        ease: "power4.out"
-      })
-      .to(titleRef.current?.querySelector('.highlight'), {
-        backgroundPosition: "200% center",
-        duration: 2,
-        ease: "power2.inOut",
-        repeat: -1,
-        yoyo: true
-      }, "-=0.5")
-      .from(subtitleRef.current, {
-        opacity: 0,
-        y: 50,
-        duration: 1,
-        ease: "power3.out"
-      }, "-=0.8")
-      .from(".hero-button", {
-        opacity: 0,
-        y: 30,
-        duration: 0.8,
-        stagger: 0.2,
-        ease: "back.out(1.7)"
-      }, "-=0.5");
+      // --- HERO SECTION ANIMATIONS ---
+      const heroTl = gsap.timeline({ defaults: { ease: 'power4.out', duration: 1.5 } });
+      heroTl
+        .from('.hero-title-line', { y: 150, stagger: 0.15, clipPath: 'inset(100% 0 0 0)' })
+        .from('.hero-subtitle', { opacity: 0, y: 50, duration: 1 }, '-=0.8')
+        .from('.hero-buttons', { opacity: 0, y: 30, duration: 1 }, '-=0.6')
+        .from('.hero-badge', { opacity: 0, scale: 0.8, y: 50, duration: 1.2, ease: 'elastic.out(1, 0.75)' }, '-=1')
+        .from('.scroll-indicator', { opacity: 0, y: 20 }, '-=0.5');
 
-      // Floating particles animation
-      gsap.to(".particle", {
-        y: -100,
-        opacity: 0,
-        duration: 3,
-        stagger: {
-          amount: 2,
-          from: "random"
+      // --- HORIZONTAL GALLERY ANIMATIONS ---
+      // This creates the horizontal scrolling effect for the gallery
+      const galleryItems = gsap.utils.toArray('.horizontal-gallery-item');
+      gsap.to(horizontalGalleryRef.current, {
+        x: () => -(horizontalGalleryRef.current!.scrollWidth - window.innerWidth),
+        ease: 'none',
+        scrollTrigger: {
+          trigger: galleryPinRef.current,
+          start: 'top top',
+          end: () => `+=${horizontalGalleryRef.current!.scrollWidth}`,
+          scrub: 1,
+          pin: true,
+          anticipatePin: 1,
+          invalidateOnRefresh: true,
         },
-        repeat: -1,
-        ease: "power2.out"
       });
 
-      // Scroll indicator animation
-      gsap.to(scrollIndicatorRef.current, {
-        y: 10,
-        duration: 1.5,
-        repeat: -1,
-        yoyo: true,
-        ease: "power2.inOut"
-      });
-
-      // Video section - triggered after 50% scroll
-      ScrollTrigger.create({
-        trigger: videoRef.current,
-        start: "top 80%",
-        end: "bottom 20%",
-        onEnter: () => {
-          gsap.fromTo(videoRef.current, 
-            { 
-              opacity: 0, 
-              scale: 0.8,
-              rotationY: 15
-            },
-            { 
-              opacity: 1, 
-              scale: 1,
-              rotationY: 0,
-              duration: 1.5,
-              ease: "power3.out",
-              onComplete: () => {
-                // Auto-play video when it comes into view
-                if (videoElementRef.current) {
-                  videoElementRef.current.play().catch(console.error);
-                }
-              }
-            }
-          );
-        }
-      });
-
-      // Features section with stagger animation
-      ScrollTrigger.create({
-        trigger: featuresRef.current,
-        start: "top 70%",
-        onEnter: () => {
-          gsap.fromTo(".feature-card", 
-            { 
-              opacity: 0, 
-              y: 100,
-              rotationX: 45
-            },
-            { 
-              opacity: 1, 
-              y: 0,
-              rotationX: 0,
-              duration: 1,
-              stagger: 0.15,
-              ease: "power3.out"
-            }
-          );
-        }
-      });
-
-      // Steps section with timeline
-      ScrollTrigger.create({
-        trigger: stepsRef.current,
-        start: "top 70%",
-        onEnter: () => {
-          const stepTl = gsap.timeline();
-          stepTl.fromTo(".step-item", 
-            { 
-              opacity: 0, 
-              x: (index) => index % 2 === 0 ? -100 : 100,
-              scale: 0.8
-            },
-            { 
-              opacity: 1, 
-              x: 0,
-              scale: 1,
-              duration: 1.2,
-              stagger: 0.3,
-              ease: "power3.out"
-            }
-          )
-          .fromTo(".step-number", 
-            { 
-              scale: 0,
-              rotation: 180
-            },
-            { 
-              scale: 1,
-              rotation: 0,
-              duration: 0.8,
-              stagger: 0.2,
-              ease: "back.out(1.7)"
-            }, "-=1"
-          );
-        }
-      });
-
-      // Testimonials with 3D effect
-      ScrollTrigger.create({
-        trigger: testimonialsRef.current,
-        start: "top 70%",
-        onEnter: () => {
-          gsap.fromTo(".testimonial-card", 
-            { 
-              opacity: 0, 
-              z: -100,
-              rotationY: 45
-            },
-            { 
-              opacity: 1, 
-              z: 0,
-              rotationY: 0,
-              duration: 1.2,
-              stagger: 0.2,
-              ease: "power3.out"
-            }
-          );
-        }
-      });
-
-      // CTA section with magnetic effect
-      ScrollTrigger.create({
-        trigger: ctaRef.current,
-        start: "top 80%",
-        onEnter: () => {
-          gsap.fromTo(ctaRef.current, 
-            { 
-              opacity: 0, 
-              scale: 0.9
-            },
-            { 
-              opacity: 1, 
-              scale: 1,
-              duration: 1,
-              ease: "power3.out"
-            }
-          );
-        }
-      });
-
-      // Parallax backgrounds
-      gsap.to(".parallax-bg-1", {
-        yPercent: -50,
-        ease: "none",
-        scrollTrigger: {
-          trigger: ".parallax-bg-1",
-          start: "top bottom",
-          end: "bottom top",
-          scrub: true
-        }
-      });
-
-      gsap.to(".parallax-bg-2", {
-        yPercent: -30,
-        ease: "none",
-        scrollTrigger: {
-          trigger: ".parallax-bg-2",
-          start: "top bottom",
-          end: "bottom top",
-          scrub: true
-        }
-      });
-
-      // Smooth scroll reveal for text elements
-      gsap.utils.toArray('.reveal-text').forEach((element: any) => {
-        gsap.fromTo(element, 
-          { 
-            opacity: 0, 
-            y: 50 
+      // Parallax effect for gallery item images
+      galleryItems.forEach((item: any) => {
+        gsap.to(item.querySelector('img, video'), {
+          x: -80,
+          ease: 'none',
+          scrollTrigger: {
+            trigger: item,
+            containerAnimation: gsap.to(horizontalGalleryRef.current, { x: () => -(horizontalGalleryRef.current!.scrollWidth - window.innerWidth), ease: 'none' }).scrollTrigger?.animation,
+            start: 'left right',
+            end: 'right left',
+            scrub: true,
           },
-          {
-            opacity: 1,
-            y: 0,
-            duration: 1,
-            ease: "power3.out",
-            scrollTrigger: {
-              trigger: element,
-              start: "top 85%",
-              toggleActions: "play none none reverse"
-            }
-          }
-        );
+        });
       });
 
-    }, heroRef);
+      // --- GENERAL SCROLL-TRIGGERED ANIMATIONS ---
+      const sections = gsap.utils.toArray('section');
+      sections.forEach((section: any) => {
+        const heading = section.querySelector('.section-heading');
+        const subheading = section.querySelector('.section-subheading');
+        const content = section.querySelectorAll('.fade-in-up');
+
+        const tl = gsap.timeline({
+          scrollTrigger: {
+            trigger: section,
+            start: 'top 80%',
+            toggleActions: 'play none none reverse',
+          },
+        });
+
+        if (heading) tl.from(heading, { opacity: 0, y: 50, duration: 1, ease: 'power3.out' });
+        if (subheading) tl.from(subheading, { opacity: 0, y: 40, duration: 1, ease: 'power3.out' }, '-=0.8');
+        if (content.length > 0) tl.from(content, { opacity: 0, y: 30, stagger: 0.15, duration: 0.8, ease: 'power3.out' }, '-=0.6');
+      });
+
+       // Stats counter animation
+      gsap.from(".stat-number", {
+        textContent: 0,
+        duration: 3,
+        ease: "power3.out",
+        snap: { textContent: 1 },
+        stagger: 0.2,
+        scrollTrigger: {
+            trigger: ".stats-section",
+            start: "top 70%",
+        }
+      });
+
+
+    }, containerRef);
 
     return () => ctx.revert();
   }, []);
 
-  const features = [
-    {
-      icon: <Bot className="w-8 h-8" />,
-      title: "No-Code AI Creation",
-      description: "Build sophisticated AI agents without writing a single line of code. Our intuitive interface makes it simple."
-    },
-    {
-      icon: <Zap className="w-8 h-8" />,
-      title: "Instant Deployment",
-      description: "Deploy your AI agent to the web in seconds. Automatic repository creation and cloud hosting included."
-    },
-    {
-      icon: <Palette className="w-8 h-8" />,
-      title: "Full Customization",
-      description: "Brand your agent with custom colors, avatars, and personality. Make it truly yours with our design tools."
-    },
-    {
-      icon: <Globe className="w-8 h-8" />,
-      title: "Embed Anywhere",
-      description: "Add your AI agent to any website with a simple script tag. Works on WordPress, Shopify, and custom sites."
-    },
-    {
-      icon: <MessageSquare className="w-8 h-8" />,
-      title: "Smart Conversations",
-      description: "Powered by advanced AI models, your agent understands context and provides helpful, accurate responses."
-    },
-    {
-      icon: <Shield className="w-8 h-8" />,
-      title: "Enterprise Security",
-      description: "Your data is secure with enterprise-grade encryption and private repository hosting."
-    }
+  // --- DATA ---
+  const galleryItems = [
+    { type: 'image', src: 'https://images.unsplash.com/photo-1593349480503-685d1a5c6870?q=80&w=2000&auto=format&fit=crop', title: 'AI-Powered Insights', description: 'Understand your customers like never before.' },
+    { type: 'video', src: '/hero-video.mp4', title: 'Dynamic Workflows', description: 'Automate complex processes with ease.' },
+    { type: 'image', src: 'https://images.unsplash.com/photo-1521737604893-d14cc237f11d?q=80&w=2000&auto=format&fit=crop', title: 'Seamless Collaboration', description: 'Bring your team together in one platform.' },
+    { type: 'image', src: 'https://images.unsplash.com/photo-1611162617474-5b21e879e113?q=80&w=2000&auto=format&fit=crop', title: 'Global Reach', description: 'Connect with audiences worldwide.' },
+    { type: 'image', src: 'https://images.unsplash.com/photo-1605810230434-7082acec1939?q=80&w=2000&auto=format&fit=crop', title: 'Advanced Analytics', description: 'Data-driven decisions for optimal performance.' },
   ];
 
-  const steps = [
-    {
-      number: "01",
-      title: "Design Your Agent",
-      description: "Customize appearance, personality, and knowledge base using our intuitive form builder.",
-      icon: "🎨"
-    },
-    {
-      number: "02",
-      title: "AI Generation",
-      description: "Our AI crafts the perfect prompts and responses based on your business requirements.",
-      icon: "🤖"
-    },
-    {
-      number: "03",
-      title: "Auto Deploy",
-      description: "Instantly deployed to repository and cloud with a custom domain and embed code ready to use.",
-      icon: "🚀"
-    }
+  const features = [
+    { icon: <Brain className="w-8 h-8" />, title: "Advanced AI Intelligence", description: "Harnessing state-of-the-art models for hyper-realistic and contextual conversations." },
+    { icon: <Rocket className="w-8 h-8" />, title: "Instant Deployment", description: "Go from concept to a live, production-ready agent in minutes, not months." },
+    { icon: <Palette className="w-8 h-8" />, title: "Deep Customization", description: "Fine-tune every aspect of your agent's personality, appearance, and behavior." },
+    { icon: <Shield className="w-8 h-8" />, title: "Fortress-Grade Security", description: "Protect your data with end-to-end encryption and enterprise-level compliance." },
+    { icon: <Globe className="w-8 h-8" />, title: "Infinite Scalability", description: "Our infrastructure effortlessly handles fluctuating demand, from one to one billion users." },
+    { icon: <Target className="w-8 h-8" />, title: "Precision Analytics", description: "Gain actionable insights from rich, real-time conversation data and user behavior." }
   ];
 
   const testimonials = [
-    {
-      name: "Sarah Chen",
-      role: "E-commerce Owner",
-      avatar: "https://images.pexels.com/photos/415829/pexels-photo-415829.jpeg?auto=compress&cs=tinysrgb&w=64&h=64&dpr=2",
-      content: "Increased customer engagement by 300% after adding our AI assistant. Setup took less than 10 minutes!",
-      rating: 5
-    },
-    {
-      name: "Marcus Johnson",
-      role: "SaaS Founder",
-      avatar: "https://images.pexels.com/photos/1040880/pexels-photo-1040880.jpeg?auto=compress&cs=tinysrgb&w=64&h=64&dpr=2",
-      content: "PLUDO.AI saved us months of development. Our support tickets dropped by 60% with our new AI agent.",
-      rating: 5
-    },
-    {
-      name: "Lisa Rodriguez",
-      role: "Digital Agency Owner",
-      avatar: "https://images.pexels.com/photos/1858175/pexels-photo-1858175.jpeg?auto=compress&cs=tinysrgb&w=64&h=64&dpr=2",
-      content: "We've deployed AI agents for 20+ clients. The quality and customization options are incredible.",
-      rating: 5
-    }
+    { name: "Alexandra Chen", role: "CEO, TechFlow", avatar: "https://images.pexels.com/photos/415829/pexels-photo-415829.jpeg?auto=compress&cs=tinysrgb&w=128&h=128&dpr=2", content: "PLUDO.AI is a paradigm shift. We've seen a 400% increase in user engagement and our support team can now focus on high-value interactions. It’s not just a tool; it’s a team member.", rating: 5, company: "TechFlow" },
+    { name: "Marcus Rodriguez", role: "Founder, InnovateLab", avatar: "https://images.pexels.com/photos/1040880/pexels-photo-1040880.jpeg?auto=compress&cs=tinysrgb&w=128&h=128&dpr=2", content: "The level of sophistication in this no-code platform is astounding. We launched a complex AI agent that has doubled our conversion rates. The ROI was almost immediate.", rating: 5, company: "InnovateLab" },
+    { name: "Sarah Williams", role: "VP Marketing, GrowthCorp", avatar: "https://images.pexels.com/photos/1858175/pexels-photo-1858175.jpeg?auto=compress&cs=tinysrgb&w=128&h=128&dpr=2", content: "Flawless execution. We’ve deployed over 50 client-facing agents without a single technical hiccup. The platform’s reliability and power are simply unmatched.", rating: 5, company: "GrowthCorp" }
   ];
 
+
   return (
-    <div className="min-h-screen overflow-x-hidden" ref={heroRef}>
-      {/* Hero Section */}
-      <section className="relative min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
-        {/* Animated Background */}
-        <div className="absolute inset-0 overflow-hidden">
-          <div className="parallax-bg-1 absolute inset-0 opacity-20">
-            <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-blue-500 rounded-full blur-3xl animate-pulse"></div>
-            <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-purple-500 rounded-full blur-3xl animate-pulse delay-1000"></div>
-            <div className="absolute top-1/2 left-1/2 w-64 h-64 bg-pink-500 rounded-full blur-3xl animate-pulse delay-2000"></div>
-          </div>
-          
-          {/* Floating Particles */}
-          {[...Array(50)].map((_, i) => (
-            <div
-              key={i}
-              className="particle absolute w-1 h-1 bg-white rounded-full opacity-30"
-              style={{
-                left: `${Math.random() * 100}%`,
-                top: `${Math.random() * 100}%`,
-                animationDelay: `${Math.random() * 3}s`
-              }}
-            />
-          ))}
-        </div>
-
-        {/* Content */}
-        <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <div className="space-y-8">
-            {/* Badge */}
-            <div className="inline-flex items-center space-x-2 bg-white/10 backdrop-blur-md px-6 py-3 rounded-full text-white text-sm font-medium border border-white/20 shadow-2xl">
-              <Sparkles className="w-4 h-4" />
-              <span>No-Code AI Agent Generator</span>
-            </div>
-
-            {/* Main Title */}
-            <h1 
-              ref={titleRef}
-              className="text-5xl md:text-7xl lg:text-8xl font-bold text-white leading-tight tracking-tight"
-            >
-              Create{' '}
-              <span className="highlight bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 bg-clip-text text-transparent bg-300% animate-gradient">
-                Intelligent
-              </span>
-              <br />
-              AI Agents in Minutes
-            </h1>
-
-            {/* Subtitle */}
-            <p 
-              ref={subtitleRef}
-              className="text-xl md:text-2xl text-gray-300 max-w-4xl mx-auto leading-relaxed font-light"
-            >
-              Build, customize, and deploy AI chatbots for your business without any coding. 
-              From customer support to lead generation, create the perfect AI assistant.
-            </p>
-
-            {/* CTA Buttons */}
-            <div className="flex flex-col sm:flex-row items-center justify-center space-y-4 sm:space-y-0 sm:space-x-6 pt-8">
-              <Link to="/signup" className="hero-button">
-                <Button 
-                  size="lg" 
-                  className="px-10 py-4 text-lg bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 shadow-2xl transform hover:scale-105 transition-all duration-300"
-                >
-                  Start Building Free
-                  <ArrowRight className="w-5 h-5 ml-2" />
-                </Button>
-              </Link>
-              
-              <button className="hero-button flex items-center space-x-3 text-white hover:text-blue-300 transition-colors group">
-                <div className="w-14 h-14 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center shadow-2xl border border-white/30 group-hover:bg-white/30 transition-all duration-300">
-                  <Play className="w-6 h-6 ml-1" />
-                </div>
-                <span className="font-medium text-lg">Watch Demo</span>
-              </button>
-            </div>
-
-            {/* Trust Indicators */}
-            <div className="pt-12">
-              <p className="text-sm text-gray-400 mb-6">Trusted by 10,000+ businesses worldwide</p>
-              <div className="flex items-center justify-center space-x-12 opacity-60">
-                {[...Array(4)].map((_, i) => (
-                  <div 
-                    key={i}
-                    className="w-28 h-10 bg-white/20 rounded-lg backdrop-blur-sm"
-                  />
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Scroll Indicator */}
-        <div 
-          ref={scrollIndicatorRef}
-          className="absolute bottom-8 left-1/2 transform -translate-x-1/2 z-20"
-        >
-          <div className="flex flex-col items-center space-y-2 text-white/70">
-            <span className="text-sm font-medium">Scroll to explore</span>
-            <ChevronDown className="w-6 h-6 animate-bounce" />
-          </div>
-        </div>
-      </section>
-
-      {/* Video Section - Triggered after 50% scroll */}
-      <section className="py-32 bg-black relative overflow-hidden">
-        <div className="parallax-bg-2 absolute inset-0 opacity-10">
-          <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-br from-blue-900/20 to-purple-900/20"></div>
+    <div className="min-h-screen overflow-x-hidden bg-brand-dark text-white font-sans" ref={containerRef}>
+      <CustomCursor />
+      
+      {/* --- HERO SECTION --- */}
+      <section className="relative min-h-screen flex items-center justify-center p-4">
+        <div className="absolute inset-0 bg-gradient-to-b from-black via-brand-dark to-brand-dark overflow-hidden">
+          <div className="absolute top-0 left-0 w-full h-full bg-[url('/grid.svg')] opacity-20"></div>
+          <div className="absolute -top-1/4 -left-1/4 w-1/2 h-1/2 bg-brand-gold/10 rounded-full blur-3xl animate-pulse-slow"></div>
+          <div className="absolute -bottom-1/4 -right-1/4 w-1/2 h-1/2 bg-primary-500/10 rounded-full blur-3xl animate-pulse-slow animation-delay-2000"></div>
         </div>
         
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-          <div className="text-center mb-16">
-            <h2 className="reveal-text text-4xl md:text-5xl font-bold text-white mb-6">
-              See the Future of{' '}
-              <span className="bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
-                AI Automation
-              </span>
-            </h2>
-            <p className="reveal-text text-xl text-gray-300 max-w-3xl mx-auto">
-              Experience the seamless integration of artificial intelligence into your business workflow
-            </p>
+        <div className="relative z-10 text-center max-w-7xl mx-auto space-y-12">
+          <div className="hero-badge inline-flex items-center space-x-3 bg-white/5 backdrop-blur-xl px-6 py-3 rounded-full border border-white/10">
+            <Sparkles className="w-5 h-5 text-brand-gold" />
+            <span className="text-brand-light-gold font-medium tracking-wide">The Premier AI Agent Platform</span>
           </div>
           
-          <div 
-            ref={videoRef}
-            className="relative rounded-3xl overflow-hidden shadow-2xl border border-white/10"
-          >
-            <video
-              ref={videoElementRef}
-              className="w-full h-auto"
-              muted
-              loop
-              playsInline
-              preload="metadata"
-              poster="/hero-video-poster.jpg"
-            >
-              <source src="/hero-video.mp4" type="video/mp4" />
-              Your browser does not support the video tag.
-            </video>
-            <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent pointer-events-none"></div>
-            
-            {/* Video overlay with play button for manual control */}
-            <div className="absolute inset-0 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity duration-300">
-              <button
-                onClick={() => {
-                  if (videoElementRef.current) {
-                    if (videoElementRef.current.paused) {
-                      videoElementRef.current.play();
-                    } else {
-                      videoElementRef.current.pause();
-                    }
-                  }
-                }}
-                className="w-20 h-20 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center text-white hover:bg-white/30 transition-all duration-300 border border-white/30"
-              >
-                <Play className="w-8 h-8 ml-1" />
-              </button>
+          <div className="hero-title-container">
+              <h1 className="text-6xl md:text-8xl lg:text-9xl font-black uppercase tracking-tighter">
+                  <span className="hero-title-line block">Create <span className="text-shimmer animate-text-shimmer bg-gradient-to-r from-brand-gold via-white to-brand-gold bg-200% bg-clip-text text-transparent">Intelligent</span></span>
+                  <span className="hero-title-line block">AI Agents</span>
+              </h1>
+          </div>
+
+          <p className="hero-subtitle text-lg md:text-xl text-gray-300 max-w-3xl mx-auto font-light leading-relaxed">
+            The world's most intuitive no-code platform for building, deploying, and scaling sophisticated AI agents that redefine user interaction.
+          </p>
+          
+          <div className="hero-buttons flex flex-col sm:flex-row items-center justify-center gap-6">
+            <Link to="/signup">
+              <Button size="lg" className="px-10 py-5 text-lg bg-brand-gold hover:bg-brand-light-gold text-black font-bold shadow-lg shadow-brand-gold/20 transform hover:scale-105 transition-all duration-300">
+                Start Building Now <ArrowRight className="w-5 h-5 ml-2" />
+              </Button>
+            </Link>
+            <button className="flex items-center text-lg text-gray-300 hover:text-white transition-colors group">
+              <span className="mr-3">Watch Demo</span>
+              <div className="w-12 h-12 rounded-full border-2 border-gray-600 group-hover:border-brand-gold transition-colors flex items-center justify-center">
+                <div className="w-0 h-0 border-l-[10px] border-l-white border-y-[7px] border-y-transparent ml-1"></div>
+              </div>
+            </button>
+          </div>
+        </div>
+        
+        <div className="scroll-indicator absolute bottom-10 left-1/2 -translate-x-1/2 flex flex-col items-center space-y-2">
+            <span className="font-medium text-gray-400 tracking-widest uppercase text-xs">Scroll</span>
+            <div className="w-px h-16 bg-gradient-to-b from-white/50 to-transparent"></div>
+        </div>
+      </section>
+
+      {/* --- HORIZONTAL GALLERY SECTION --- */}
+      <section ref={galleryPinRef} className="relative h-auto bg-brand-dark py-24">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center mb-20">
+          <h2 className="section-heading text-5xl md:text-6xl font-bold mb-4">A Canvas for Your Vision</h2>
+          <p className="section-subheading text-xl text-gray-400 max-w-3xl mx-auto">From concept to reality, our platform provides the tools to build stunningly effective AI agents.</p>
+        </div>
+        <div ref={horizontalGalleryRef} className="flex space-x-8">
+            {galleryItems.map((item, index) => (
+                <div key={index} className="horizontal-gallery-item flex-shrink-0 w-[60vw] h-[70vh] relative rounded-2xl overflow-hidden group">
+                    {item.type === 'video' ? (
+                        <video className="w-full h-full object-cover" autoPlay muted loop playsInline>
+                            <source src={item.src} type="video/mp4" />
+                        </video>
+                    ) : (
+                        <img src={item.src} alt={item.title} className="w-full h-full object-cover" />
+                    )}
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent flex flex-col justify-end p-8 transition-all duration-500 opacity-0 group-hover:opacity-100">
+                        <h3 className="text-3xl font-bold mb-2">{item.title}</h3>
+                        <p className="text-lg text-gray-300">{item.description}</p>
+                    </div>
+                </div>
+            ))}
+            {/* Add a concluding card to the horizontal scroll */}
+            <div className="horizontal-gallery-item flex-shrink-0 w-[60vw] h-[70vh] flex items-center justify-center bg-brand-gray rounded-2xl p-8 text-center">
+                <div className="space-y-6">
+                    <Sparkles className="w-16 h-16 text-brand-gold mx-auto" />
+                    <h3 className="text-4xl font-bold">Your Masterpiece Awaits</h3>
+                    <p className="text-xl text-gray-400">What will you create?</p>
+                </div>
             </div>
+        </div>
+      </section>
+      
+      {/* --- STATS SECTION --- */}
+      <section className="stats-section py-32 bg-black">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12">
+            {[
+              { number: 50, suffix: "K+", label: "Active AI Agents" },
+              { number: 99.9, suffix: "%", label: "Uptime SLA" },
+              { number: 2, suffix: "M+", label: "Conversations Daily" },
+              { number: 150, suffix: "+", label: "Countries Served" }
+            ].map((stat, index) => (
+              <div key={index} className="text-center fade-in-up">
+                <div className="text-6xl md:text-7xl font-black text-white mb-2">
+                  <span className="stat-number" data-value={stat.number}>0</span>
+                  <span className="bg-gradient-to-r from-brand-gold to-brand-light-gold bg-clip-text text-transparent">{stat.suffix}</span>
+                </div>
+                <div className="text-gray-400 text-lg font-medium tracking-wider uppercase">{stat.label}</div>
+              </div>
+            ))}
           </div>
         </div>
       </section>
 
-      {/* Features Section */}
-      <section ref={featuresRef} className="py-32 bg-gradient-to-b from-white to-gray-50 dark:from-gray-900 dark:to-gray-800 relative">
+      {/* --- FEATURES SECTION --- */}
+      <section className="py-32 bg-brand-dark">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-20">
-            <h2 className="reveal-text text-4xl md:text-5xl font-bold text-gray-900 dark:text-white mb-6">
-              Everything You Need to Build{' '}
-              <span className="bg-gradient-to-r from-primary-600 to-secondary-600 bg-clip-text text-transparent">
-                Amazing AI Agents
-              </span>
-            </h2>
-            <p className="reveal-text text-xl text-gray-600 dark:text-gray-300 max-w-3xl mx-auto">
-              From design to deployment, we handle the complexity so you can focus on growing your business.
-            </p>
+            <h2 className="section-heading text-5xl md:text-6xl font-bold mb-4">Engineered for Excellence</h2>
+            <p className="section-subheading text-xl text-gray-400 max-w-3xl mx-auto">Every feature is meticulously crafted to deliver unparalleled performance and a seamless user experience.</p>
           </div>
-
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {features.map((feature, index) => (
-              <div
-                key={index}
-                className="feature-card group"
-              >
-                <Card className="p-8 h-full bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 hover:shadow-2xl transition-all duration-500 group-hover:scale-105">
-                  <div className="text-primary-600 dark:text-primary-400 mb-6 transform group-hover:scale-110 transition-transform duration-300">
-                    {feature.icon}
-                  </div>
-                  <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
-                    {feature.title}
-                  </h3>
-                  <p className="text-gray-600 dark:text-gray-300 leading-relaxed">
-                    {feature.description}
-                  </p>
-                </Card>
+              <div key={index} className="fade-in-up">
+                 <Card className="p-8 h-full bg-brand-gray border border-brand-light-gray/50 rounded-2xl group transition-all duration-300 hover:border-brand-gold/50 hover:bg-brand-light-gray/50">
+                   <div className="mb-6">
+                     <div className="inline-flex p-4 rounded-xl bg-brand-light-gray group-hover:bg-brand-gold/20 transition-colors duration-300">
+                        <div className="text-brand-gold">{feature.icon}</div>
+                     </div>
+                   </div>
+                   <h3 className="text-2xl font-bold text-white mb-3">{feature.title}</h3>
+                   <p className="text-gray-400 leading-relaxed">{feature.description}</p>
+                 </Card>
               </div>
             ))}
           </div>
         </div>
       </section>
-
-      {/* How It Works */}
-      <section ref={stepsRef} className="py-32 bg-gradient-to-b from-gray-50 to-white dark:from-gray-800 dark:to-gray-900 relative overflow-hidden">
-        <div className="absolute inset-0 opacity-5">
-          <div className="absolute top-20 left-20 w-72 h-72 bg-blue-500 rounded-full blur-3xl"></div>
-          <div className="absolute bottom-20 right-20 w-96 h-96 bg-purple-500 rounded-full blur-3xl"></div>
-        </div>
-
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative">
-          <div className="text-center mb-20">
-            <h2 className="reveal-text text-4xl md:text-5xl font-bold text-gray-900 dark:text-white mb-6">
-              How It Works
-            </h2>
-            <p className="reveal-text text-xl text-gray-600 dark:text-gray-300 max-w-3xl mx-auto">
-              Three simple steps to launch your AI agent and start engaging with customers.
-            </p>
-          </div>
-
-          <div className="space-y-24">
-            {steps.map((step, index) => (
-              <div
-                key={index}
-                className={`step-item flex flex-col lg:flex-row items-center space-y-12 lg:space-y-0 lg:space-x-16 ${
-                  index % 2 === 1 ? 'lg:flex-row-reverse lg:space-x-reverse' : ''
-                }`}
-              >
-                <div className="flex-1 space-y-6">
-                  <div className="flex items-center space-x-4">
-                    <div className="step-number w-16 h-16 bg-gradient-to-r from-primary-600 to-secondary-600 rounded-full flex items-center justify-center text-white font-bold text-xl shadow-2xl">
-                      {step.number}
-                    </div>
-                    <h3 className="text-3xl font-bold text-gray-900 dark:text-white">
-                      {step.title}
-                    </h3>
-                  </div>
-                  <p className="text-lg text-gray-600 dark:text-gray-300 leading-relaxed max-w-lg">
-                    {step.description}
-                  </p>
-                </div>
-                
-                <div className="flex-1">
-                  <div className="w-full h-80 bg-gradient-to-br from-primary-100 to-secondary-100 dark:from-primary-900/20 dark:to-secondary-900/20 rounded-3xl flex items-center justify-center shadow-2xl border border-gray-200/50 dark:border-gray-700/50 backdrop-blur-sm">
-                    <div className="text-8xl transform hover:scale-110 transition-transform duration-300">
-                      {step.icon}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Testimonials */}
-      <section ref={testimonialsRef} className="py-32 bg-gradient-to-b from-white to-gray-50 dark:from-gray-900 dark:to-gray-800 relative">
+      
+      {/* --- TESTIMONIALS --- */}
+      <section className="py-32 bg-black">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-20">
-            <h2 className="reveal-text text-4xl md:text-5xl font-bold text-gray-900 dark:text-white mb-6">
-              Loved by Businesses Worldwide
-            </h2>
-            <p className="reveal-text text-xl text-gray-600 dark:text-gray-300 max-w-3xl mx-auto">
-              See how companies are transforming their customer experience with AI agents.
-            </p>
+            <h2 className="section-heading text-5xl md:text-6xl font-bold mb-4">Trusted by Industry Leaders</h2>
+            <p className="section-subheading text-xl text-gray-400 max-w-3xl mx-auto">Join the innovators who are transforming their businesses with our platform.</p>
           </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             {testimonials.map((testimonial, index) => (
-              <div
-                key={index}
-                className="testimonial-card group"
-              >
-                <Card className="p-8 h-full bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 hover:shadow-2xl transition-all duration-500 group-hover:scale-105">
-                  <div className="flex items-center mb-6">
+              <div key={index} className="fade-in-up">
+                <Card className="p-8 h-full bg-brand-dark border border-brand-light-gray/50 rounded-2xl flex flex-col">
+                  <div className="flex mb-4">
                     {[...Array(testimonial.rating)].map((_, i) => (
-                      <Star key={i} className="w-5 h-5 text-yellow-400 fill-current" />
+                      <Star key={i} className="w-5 h-5 text-brand-gold fill-current" />
                     ))}
                   </div>
-                  <blockquote className="text-gray-600 dark:text-gray-300 mb-8 italic text-lg leading-relaxed">
+                  <blockquote className="text-gray-300 mb-6 italic text-lg leading-relaxed flex-grow">
                     "{testimonial.content}"
                   </blockquote>
-                  <div className="flex items-center">
-                    <img
-                      src={testimonial.avatar}
-                      alt={testimonial.name}
-                      className="w-14 h-14 rounded-full mr-4 shadow-lg"
-                    />
+                  <div className="flex items-center mt-auto">
+                    <img src={testimonial.avatar} alt={testimonial.name} className="w-14 h-14 rounded-full mr-4 border-2 border-brand-gold/50" />
                     <div>
-                      <div className="font-semibold text-gray-900 dark:text-white text-lg">
-                        {testimonial.name}
-                      </div>
-                      <div className="text-sm text-gray-500 dark:text-gray-400">
-                        {testimonial.role}
-                      </div>
+                      <div className="font-bold text-white text-lg">{testimonial.name}</div>
+                      <div className="text-brand-gold text-sm font-medium">{testimonial.role}, {testimonial.company}</div>
                     </div>
                   </div>
                 </Card>
@@ -651,43 +330,30 @@ export const Landing: React.FC = () => {
         </div>
       </section>
 
-      {/* CTA Section */}
-      <section ref={ctaRef} className="py-32 bg-gradient-to-r from-primary-600 via-purple-600 to-secondary-600 relative overflow-hidden">
-        <div className="absolute inset-0 bg-black/20"></div>
-        <div className="absolute inset-0 opacity-30">
-          <div className="absolute top-0 left-0 w-96 h-96 bg-white rounded-full blur-3xl"></div>
-          <div className="absolute bottom-0 right-0 w-80 h-80 bg-blue-300 rounded-full blur-3xl"></div>
-        </div>
-
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center relative z-10">
-          <div className="space-y-8">
-            <h2 className="text-4xl md:text-5xl lg:text-6xl font-bold text-white leading-tight">
-              Ready to Transform Your Business?
+      {/* --- FINAL CTA --- */}
+      <section className="py-32 relative overflow-hidden bg-brand-dark">
+        <div className="absolute inset-0 bg-gradient-to-t from-brand-gold/20 via-brand-dark to-brand-dark"></div>
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 text-center relative z-10">
+          <div className="space-y-12">
+            <h2 className="section-heading text-5xl md:text-7xl font-black leading-tight">
+              Ready to Build the Future?
             </h2>
-            <p className="text-xl md:text-2xl text-primary-100 max-w-3xl mx-auto leading-relaxed">
-              Join thousands of businesses already using AI agents to provide better customer experiences.
+            <p className="section-subheading text-2xl text-gray-300 max-w-3xl mx-auto leading-relaxed font-light">
+              Join thousands of visionary businesses already transforming their customer experience with AI.
             </p>
-            <div className="flex flex-col sm:flex-row items-center justify-center space-y-6 sm:space-y-0 sm:space-x-8 pt-8">
-              <Link to="/signup">
-                <Button 
-                  size="lg" 
-                  className="px-10 py-4 text-lg bg-white text-primary-600 hover:bg-gray-100 shadow-2xl transform hover:scale-105 transition-all duration-300"
-                >
-                  Start Building Now
-                  <ArrowRight className="w-5 h-5 ml-2" />
+            <div className="fade-in-up flex flex-col sm:flex-row items-center justify-center gap-6">
+               <Link to="/signup">
+                <Button size="lg" className="px-12 py-6 text-xl bg-brand-gold hover:bg-brand-light-gold text-black font-bold shadow-lg shadow-brand-gold/30 transform hover:scale-105 transition-all duration-300 border-2 border-black">
+                  Start Your Free Trial <ArrowRight className="w-6 h-6 ml-3" />
                 </Button>
               </Link>
-              <div className="flex items-center text-primary-100 text-lg">
-                <Check className="w-5 h-5 mr-2" />
-                No credit card required
-              </div>
+            </div>
+            <div className="fade-in-up flex items-center justify-center text-gray-400 text-lg font-medium">
+               <Check className="w-6 h-6 mr-3 text-brand-gold" />
+               Free forever plan • No credit card required
             </div>
           </div>
         </div>
-
-        {/* Floating Elements */}
-        <div className="absolute top-20 left-20 w-24 h-24 bg-white/10 rounded-full animate-float"></div>
-        <div className="absolute bottom-20 right-20 w-20 h-20 bg-white/10 rounded-full animate-float-delayed"></div>
       </section>
     </div>
   );
