@@ -1307,7 +1307,7 @@ The following environment variables are configured:
 
 - **PLUDO.AI** - No-code AI agent generator
 - **${config.apiProvider === 'openrouter' ? 'OpenRouter' : 'Google Gemini'}** - AI model API
-- **Vercel** - Hosting and deployment
+- **Cloud Platform** - Hosting and deployment
 - **React** - Frontend framework
 - **Tailwind CSS** - Styling
 

@@ -14,14 +14,15 @@ import {
   Plus,
   Globe,
   AlertCircle,
-  Trash2
+  Trash2,
+  Server,
+  Cloud
 } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { useAuthStore } from '../store/authStore';
 import { supabase } from '../lib/supabase';
 import { isPublicHostedUrl } from '../utils/url';
-import { GitHubService } from '../lib/github';
 import toast from 'react-hot-toast';
 
 interface Agent {
@@ -35,7 +36,7 @@ interface Agent {
   updated_at: string;
 }
 
-// GitHub token for repository operations
+// Repository token for operations
 const GITHUB_TOKEN = 'ghp_vQZhGJKLMNOPQRSTUVWXYZ1234567890abcdef';
 
 export const Dashboard: React.FC = () => {
@@ -81,21 +82,20 @@ export const Dashboard: React.FC = () => {
   };
 
   const handleDeleteAgent = async (agent: Agent) => {
-    if (!confirm(`Are you sure you want to delete "${agent.name}"? This will permanently delete the agent, its GitHub repository, and cannot be undone.`)) {
+    if (!confirm(`Are you sure you want to delete "${agent.name}"? This will permanently delete the agent, its repository, and cannot be undone.`)) {
       return;
     }
 
     setDeletingAgents(prev => new Set(prev).add(agent.id));
 
     try {
-      // Delete from GitHub if repository exists
+      // Delete from repository if repository exists
       if (agent.github_repo) {
         try {
-          const github = new GitHubService(GITHUB_TOKEN);
           const repoFullName = agent.github_repo.replace('https://github.com/', '').replace('.git', '');
           
-          // Delete the GitHub repository
-          await fetch(`https://api.github.com/repos/${repoFullName}`, {
+          // Delete the repository
+          const response = await fetch(`https://api.github.com/repos/${repoFullName}`, {
             method: 'DELETE',
             headers: {
               'Authorization': `token ${GITHUB_TOKEN}`,
@@ -103,11 +103,17 @@ export const Dashboard: React.FC = () => {
             },
           });
 
-          console.log(`GitHub repository ${repoFullName} deleted successfully`);
+          if (response.ok) {
+            console.log(`Repository ${repoFullName} deleted successfully`);
+          } else {
+            console.error('Failed to delete repository:', response.status, response.statusText);
+            // Continue with database deletion even if repository deletion fails
+            toast.error('Warning: Failed to delete repository, but continuing with agent deletion');
+          }
         } catch (githubError) {
-          console.error('Failed to delete GitHub repository:', githubError);
-          // Continue with database deletion even if GitHub deletion fails
-          toast.error('Warning: Failed to delete GitHub repository, but continuing with agent deletion');
+          console.error('Failed to delete repository:', githubError);
+          // Continue with database deletion even if repository deletion fails
+          toast.error('Warning: Failed to delete repository, but continuing with agent deletion');
         }
       }
 

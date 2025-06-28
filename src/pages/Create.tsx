@@ -21,7 +21,9 @@ import {
   Globe,
   Zap,
   Key,
-  Shield
+  Shield,
+  Server,
+  Cloud
 } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
@@ -88,7 +90,8 @@ export const Create: React.FC = () => {
     // New API configuration fields
     apiProvider: 'openrouter',
     apiKey: '',
-    model: 'deepseek/deepseek-r1'
+    model: 'deepseek/deepseek-r1',
+    customModel: ''
   });
 
   const [faqs, setFaqs] = useState<FAQ[]>([
@@ -98,8 +101,8 @@ export const Create: React.FC = () => {
   // Deployment state
   const [deploymentSteps, setDeploymentSteps] = useState<DeploymentStep[]>([
     { id: 'step-1', title: 'Generate Agent Code', status: 'pending' },
-    { id: 'step-2', title: 'Upload to GitHub', status: 'pending' },
-    { id: 'step-3', title: 'Deploy to Vercel', status: 'pending' },
+    { id: 'step-2', title: 'Upload to Repository', status: 'pending' },
+    { id: 'step-3', title: 'Deploy to Cloud', status: 'pending' },
   ]);
 
   const [currentAgentId, setCurrentAgentId] = useState<string | null>(null);
@@ -110,8 +113,8 @@ export const Create: React.FC = () => {
   // Button states
   const [buttonStates, setButtonStates] = useState({
     generateCode: false,
-    uploadGithub: false,
-    deployVercel: false,
+    uploadRepo: false,
+    deployCloud: false,
     makeItLive: false,
   });
 
@@ -125,7 +128,8 @@ export const Create: React.FC = () => {
         { id: 'deepseek/deepseek-r1', name: 'DeepSeek R1 (Recommended)' },
         { id: 'openai/gpt-4o', name: 'GPT-4o' },
         { id: 'anthropic/claude-3.5-sonnet', name: 'Claude 3.5 Sonnet' },
-        { id: 'meta-llama/llama-3.1-8b-instruct', name: 'Llama 3.1 8B' }
+        { id: 'meta-llama/llama-3.1-8b-instruct', name: 'Llama 3.1 8B' },
+        { id: 'custom', name: 'Custom Model' }
       ]
     },
     {
@@ -133,7 +137,8 @@ export const Create: React.FC = () => {
       name: 'Google Gemini',
       description: 'Google\'s advanced AI model with multimodal capabilities',
       models: [
-        { id: 'gemini-1.5-pro', name: 'Gemini 1.5 Pro (Recommended)' },
+        { id: 'gemini-2.0-flash', name: 'Gemini 2.0 Flash (Recommended)' },
+        { id: 'gemini-1.5-pro', name: 'Gemini 1.5 Pro' },
         { id: 'gemini-1.5-flash', name: 'Gemini 1.5 Flash' },
         { id: 'gemini-pro', name: 'Gemini Pro' }
       ]
@@ -206,8 +211,8 @@ export const Create: React.FC = () => {
   const resetDeploymentSteps = () => {
     setDeploymentSteps([
       { id: 'step-1', title: 'Generate Agent Code', status: 'pending' },
-      { id: 'step-2', title: 'Upload to GitHub', status: 'pending' },
-      { id: 'step-3', title: 'Deploy to Vercel', status: 'pending' },
+      { id: 'step-2', title: 'Upload to Repository', status: 'pending' },
+      { id: 'step-3', title: 'Deploy to Cloud', status: 'pending' },
     ]);
   };
 
@@ -236,6 +241,10 @@ export const Create: React.FC = () => {
       toast.error('API key is required');
       return false;
     }
+    if (formData.model === 'custom' && !formData.customModel.trim()) {
+      toast.error('Custom model name is required');
+      return false;
+    }
     return true;
   };
 
@@ -257,9 +266,13 @@ export const Create: React.FC = () => {
       // Ensure subdomain is generated if not already
       const finalSubdomain = formData.subdomain || generateSubdomain(formData.brandName);
 
+      // Use custom model if selected
+      const finalModel = formData.model === 'custom' ? formData.customModel : formData.model;
+
       const config = {
         ...formData,
         subdomain: finalSubdomain,
+        model: finalModel,
         services: formData.services.filter(s => s.trim()),
         faqs: faqs.filter(faq => faq.question.trim() && faq.answer.trim()),
         userId: user.id,
@@ -285,65 +298,65 @@ export const Create: React.FC = () => {
     }
   };
 
-  const handleUploadToGitHub = async () => {
+  const handleUploadToRepo = async () => {
     if (!currentAgentId) {
       toast.error('Please generate agent code first');
       return;
     }
 
     setIsDeploying(true);
-    setButtonLoading('uploadGithub', true);
+    setButtonLoading('uploadRepo', true);
 
     try {
-      updateDeploymentStep('step-2', 'loading', 'Creating GitHub repository...');
+      updateDeploymentStep('step-2', 'loading', 'Creating repository...');
 
       const result = await uploadToGitHub(currentAgentId);
 
       if (result.success) {
-        updateDeploymentStep('step-2', 'success', 'Uploaded to GitHub successfully');
+        updateDeploymentStep('step-2', 'success', 'Uploaded to repository successfully');
         setDeploymentResult(prev => ({ ...prev, ...result }));
-        toast.success('Code uploaded to GitHub successfully!');
+        toast.success('Code uploaded to repository successfully!');
       } else {
         updateDeploymentStep('step-2', 'error', result.error);
-        toast.error(result.error || 'Failed to upload to GitHub');
+        toast.error(result.error || 'Failed to upload to repository');
       }
     } catch (error: any) {
       updateDeploymentStep('step-2', 'error', error.message);
-      toast.error('Failed to upload to GitHub');
+      toast.error('Failed to upload to repository');
     } finally {
       setIsDeploying(false);
-      setButtonLoading('uploadGithub', false);
+      setButtonLoading('uploadRepo', false);
     }
   };
 
-  const handleDeployToVercel = async () => {
+  const handleDeployToCloud = async () => {
     if (!currentAgentId) {
-      toast.error('Please upload to GitHub first');
+      toast.error('Please upload to repository first');
       return;
     }
 
     setIsDeploying(true);
-    setButtonLoading('deployVercel', true);
+    setButtonLoading('deployCloud', true);
 
     try {
-      updateDeploymentStep('step-3', 'loading', 'Deploying to Vercel...');
+      updateDeploymentStep('step-3', 'loading', 'Deploying to cloud...');
 
       const result = await deployToVercel(currentAgentId);
 
       if (result.success) {
-        updateDeploymentStep('step-3', 'success', 'Deployed to Vercel successfully');
+        updateDeploymentStep('step-3', 'success', 'Deployed to cloud successfully');
         setDeploymentResult(prev => ({ ...prev, ...result }));
         toast.success('Agent deployed successfully!');
       } else {
         updateDeploymentStep('step-3', 'error', result.error);
-        toast.error(result.error || 'Failed to deploy to Vercel');
+        toast.error(result.error || 'Failed to deploy to cloud');
       }
     } catch (error: any) {
       updateDeploymentStep('step-3', 'error', error.message);
-      toast.error('Failed to deploy to Vercel');
+      toast.error('Failed to deploy to cloud');
     } finally {
       setIsDeploying(false);
-      setButtonLoading('deployVercel', false);
+      setButtonLoading('deployCloud', false);
     }
   };
 
@@ -406,8 +419,8 @@ export const Create: React.FC = () => {
 
   // Check if buttons should be disabled
   const isGenerateCodeDisabled = buttonStates.generateCode || isDeploying;
-  const isUploadGithubDisabled = buttonStates.uploadGithub || isDeploying || deploymentSteps[0]?.status !== 'success';
-  const isDeployVercelDisabled = buttonStates.deployVercel || isDeploying || deploymentSteps[1]?.status !== 'success';
+  const isUploadRepoDisabled = buttonStates.uploadRepo || isDeploying || deploymentSteps[0]?.status !== 'success';
+  const isDeployCloudDisabled = buttonStates.deployCloud || isDeploying || deploymentSteps[1]?.status !== 'success';
   const isMakeItLiveDisabled = buttonStates.makeItLive || !deploymentResult?.githubRepo;
 
   if (!user) {
@@ -622,6 +635,22 @@ export const Create: React.FC = () => {
                       ))}
                     </select>
                   </div>
+
+                  {/* Custom Model Input (only for OpenRouter) */}
+                  {formData.apiProvider === 'openrouter' && formData.model === 'custom' && (
+                    <div>
+                      <Input
+                        label="Custom Model Name"
+                        value={formData.customModel}
+                        onChange={(e) => handleInputChange('customModel', e.target.value)}
+                        placeholder="e.g., anthropic/claude-3-opus, openai/gpt-4-turbo"
+                        required
+                      />
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                        Enter the exact model name as it appears in the OpenRouter documentation
+                      </p>
+                    </div>
+                  )}
 
                   {/* API Key Input */}
                   <div>
@@ -903,7 +932,7 @@ export const Create: React.FC = () => {
                     
                     <div className="text-xs text-gray-500 dark:text-gray-400 space-y-1">
                       <div>Tone: {formData.tone} • Type: {formData.agentType.replace('-', ' ')}</div>
-                      <div>AI: {getCurrentProvider()?.name} • Model: {getCurrentModels().find(m => m.id === formData.model)?.name}</div>
+                      <div>AI: {getCurrentProvider()?.name} • Model: {getCurrentModels().find(m => m.id === formData.model)?.name || (formData.model === 'custom' ? formData.customModel : formData.model)}</div>
                     </div>
                   </div>
 
@@ -919,25 +948,25 @@ export const Create: React.FC = () => {
                     </Button>
 
                     <Button
-                      onClick={handleUploadToGitHub}
-                      disabled={isUploadGithubDisabled}
+                      onClick={handleUploadToRepo}
+                      disabled={isUploadRepoDisabled}
                       variant="outline"
                       className="w-full"
-                      loading={buttonStates.uploadGithub}
+                      loading={buttonStates.uploadRepo}
                     >
-                      <Github className="w-4 h-4 mr-2" />
-                      Upload to GitHub
+                      <Server className="w-4 h-4 mr-2" />
+                      Upload to Repository
                     </Button>
 
                     <Button
-                      onClick={handleDeployToVercel}
-                      disabled={isDeployVercelDisabled}
+                      onClick={handleDeployToCloud}
+                      disabled={isDeployCloudDisabled}
                       variant="secondary"
                       className="w-full"
-                      loading={buttonStates.deployVercel}
+                      loading={buttonStates.deployCloud}
                     >
-                      <Rocket className="w-4 h-4 mr-2" />
-                      Deploy to Vercel
+                      <Cloud className="w-4 h-4 mr-2" />
+                      Deploy to Cloud
                     </Button>
 
                     {/* Make it Live Button */}
@@ -1003,9 +1032,9 @@ export const Create: React.FC = () => {
                           {deploymentResult.githubRepo && (
                             <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
                               <div className="flex items-center space-x-2">
-                                <Github className="w-4 h-4 text-gray-600 dark:text-gray-400" />
+                                <Server className="w-4 h-4 text-gray-600 dark:text-gray-400" />
                                 <span className="text-sm text-gray-600 dark:text-gray-300">
-                                  GitHub Repo
+                                  Repository
                                 </span>
                               </div>
                               <div className="flex items-center space-x-2">
