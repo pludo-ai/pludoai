@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { Navbar } from './components/layout/Navbar';
 import { Footer } from './components/layout/Footer';
+import { BoltBadge } from './components/ui/BoltBadge';
 import { Landing } from './pages/Landing';
 import { Login } from './pages/Login';
 import { Signup } from './pages/Signup';
@@ -104,6 +105,7 @@ function App() {
           </Routes>
         </main>
         <Footer />
+        <BoltBadge />
         <Toaster
           position="top-right"
           toastOptions={{
