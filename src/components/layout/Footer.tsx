@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Bot, Github, Twitter, Linkedin } from 'lucide-react';
+import { Bot, Github, Twitter, Linkedin, Zap } from 'lucide-react';
 
 export const Footer: React.FC = () => {
   return (
@@ -61,13 +61,23 @@ export const Footer: React.FC = () => {
           <p className="text-gray-400 text-sm">
             © 2025 PLUDO.AI. All rights reserved.
           </p>
-          <div className="flex space-x-6 mt-4 md:mt-0">
+          <div className="flex items-center space-x-6 mt-4 md:mt-0">
             <Link to="/privacy" className="text-gray-400 hover:text-white text-sm transition-colors">
               Privacy Policy
             </Link>
             <Link to="/terms" className="text-gray-400 hover:text-white text-sm transition-colors">
               Terms of Service
             </Link>
+            {/* Bolt Badge */}
+            <a 
+              href="https://bolt.new" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="flex items-center space-x-2 text-gray-400 hover:text-white text-sm transition-colors group"
+            >
+              <Zap className="w-4 h-4 group-hover:text-yellow-400 transition-colors" />
+              <span>Built with Bolt</span>
+            </a>
           </div>
         </div>
       </div>
