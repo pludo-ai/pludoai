@@ -216,6 +216,27 @@ body {
   margin: 0;
   padding: 0;
   font-family: 'Inter', system-ui, sans-serif;
+}
+      /* Ensure floating widget is always clickable */
+#widget-root {
+  position: relative;
+  z-index: 2147483647;
+}
+
+#widget-root * {
+  box-sizing: border-box;
+}
+
+/* Force pointer events for floating button */
+#widget-root button[style*="cursor: pointer"] {
+  pointer-events: auto !important;
+  cursor: pointer !important;
+}
+
+/* Ensure proper stacking context */
+#widget-root > div {
+  position: relative;
+  z-index: 2147483647;
 }`
     },
     {
