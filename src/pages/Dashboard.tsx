@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { 
   Bot, 
@@ -12,13 +13,15 @@ import {
   Edit,
   Plus,
   Globe,
-  AlertCircle
+  AlertCircle,
+  Trash2
 } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { useAuthStore } from '../store/authStore';
 import { supabase } from '../lib/supabase';
 import { isPublicHostedUrl } from '../utils/url';
+import { GitHubService } from '../lib/github';
 import toast from 'react-hot-toast';
 
 interface Agent {
@@ -32,11 +35,16 @@ interface Agent {
   updated_at: string;
 }
 
+// GitHub token for repository operations
+const GITHUB_TOKEN = 'ghp_vQZhGJKLMNOPQRSTUVWXYZ1234567890abcdef';
+
 export const Dashboard: React.FC = () => {
+  const navigate = useNavigate();
   const { user, setUser } = useAuthStore();
   const [activeTab, setActiveTab] = useState('overview');
   const [agents, setAgents] = useState<Agent[]>([]);
   const [loading, setLoading] = useState(true);
+  const [deletingAgents, setDeletingAgents] = useState<Set<string>>(new Set());
 
   const tabs = [
     { id: 'overview', label: 'Overview', icon: <Bot className="w-4 h-4" /> },
@@ -65,6 +73,65 @@ export const Dashboard: React.FC = () => {
       toast.error('Failed to fetch agents: ' + error.message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleCreateAgent = () => {
+    navigate('/create');
+  };
+
+  const handleDeleteAgent = async (agent: Agent) => {
+    if (!confirm(`Are you sure you want to delete "${agent.name}"? This will permanently delete the agent, its GitHub repository, and cannot be undone.`)) {
+      return;
+    }
+
+    setDeletingAgents(prev => new Set(prev).add(agent.id));
+
+    try {
+      // Delete from GitHub if repository exists
+      if (agent.github_repo) {
+        try {
+          const github = new GitHubService(GITHUB_TOKEN);
+          const repoFullName = agent.github_repo.replace('https://github.com/', '').replace('.git', '');
+          
+          // Delete the GitHub repository
+          await fetch(`https://api.github.com/repos/${repoFullName}`, {
+            method: 'DELETE',
+            headers: {
+              'Authorization': `token ${GITHUB_TOKEN}`,
+              'Accept': 'application/vnd.github.v3+json',
+            },
+          });
+
+          console.log(`GitHub repository ${repoFullName} deleted successfully`);
+        } catch (githubError) {
+          console.error('Failed to delete GitHub repository:', githubError);
+          // Continue with database deletion even if GitHub deletion fails
+          toast.error('Warning: Failed to delete GitHub repository, but continuing with agent deletion');
+        }
+      }
+
+      // Delete from database
+      const { error } = await supabase
+        .from('agents')
+        .delete()
+        .eq('id', agent.id);
+
+      if (error) throw error;
+
+      // Update local state
+      setAgents(prev => prev.filter(a => a.id !== agent.id));
+      toast.success(`Agent "${agent.name}" deleted successfully`);
+
+    } catch (error: any) {
+      console.error('Delete agent error:', error);
+      toast.error('Failed to delete agent: ' + error.message);
+    } finally {
+      setDeletingAgents(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(agent.id);
+        return newSet;
+      });
     }
   };
 
@@ -164,7 +231,7 @@ export const Dashboard: React.FC = () => {
                 </h3>
                 <Button 
                   className="flex items-center"
-                  onClick={() => window.location.href = '/create'}
+                  onClick={handleCreateAgent}
                 >
                   <Plus className="w-4 h-4 mr-2" />
                   Create New Agent
@@ -180,7 +247,7 @@ export const Dashboard: React.FC = () => {
                 <div className="text-center py-8">
                   <Bot className="w-12 h-12 text-gray-400 mx-auto mb-4" />
                   <p className="text-gray-500 mb-4">No agents created yet</p>
-                  <Button onClick={() => window.location.href = '/create'}>
+                  <Button onClick={handleCreateAgent}>
                     Create Your First Agent
                   </Button>
                 </div>
@@ -189,6 +256,7 @@ export const Dashboard: React.FC = () => {
                   {agents.map((agent) => {
                     const agentStatus = getAgentStatus(agent);
                     const hasPublicUrl = agent.vercel_url && isPublicHostedUrl(agent.vercel_url);
+                    const isDeleting = deletingAgents.has(agent.id);
                     
                     return (
                       <div
@@ -239,11 +307,26 @@ export const Dashboard: React.FC = () => {
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => window.location.href = '/create'}
+                            onClick={handleCreateAgent}
                             className="flex items-center"
                           >
                             <Edit className="w-4 h-4 mr-1" />
                             Edit
+                          </Button>
+
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleDeleteAgent(agent)}
+                            disabled={isDeleting}
+                            className="flex items-center text-red-600 border-red-300 hover:bg-red-50 dark:hover:bg-red-900/20"
+                          >
+                            {isDeleting ? (
+                              <div className="w-4 h-4 border-2 border-red-600 border-t-transparent rounded-full animate-spin mr-1" />
+                            ) : (
+                              <Trash2 className="w-4 h-4 mr-1" />
+                            )}
+                            {isDeleting ? 'Deleting...' : 'Delete'}
                           </Button>
                         </div>
                       </div>
@@ -364,7 +447,7 @@ export const Dashboard: React.FC = () => {
                         </h4>
                         <ol className="text-sm text-blue-800 dark:text-blue-300 space-y-1 list-decimal list-inside">
                           <li>Copy the embed code above</li>
-                          <li>Paste it into your website's HTML, preferably before the closing &lt;/body&gt; tag</li>
+                          <li>Paste it into your website's HTML, preferably before the closing </body> tag</li>
                           <li>Your AI agent will appear as a floating chat button</li>
                           <li>Test it on your website to ensure it's working correctly</li>
                         </ol>
@@ -379,7 +462,7 @@ export const Dashboard: React.FC = () => {
                       <p className="text-sm text-gray-400 mb-4">
                         Agents must be successfully deployed and have a public URL to generate embed codes.
                       </p>
-                      <Button onClick={() => window.location.href = '/create'}>
+                      <Button onClick={handleCreateAgent}>
                         Create Your First Agent
                       </Button>
                     </div>
