@@ -48,7 +48,9 @@ export default {
       animation: {
         'glow': 'glow 2s ease-in-out infinite alternate',
         'float': 'float 6s ease-in-out infinite',
+        'float-delayed': 'float 6s ease-in-out infinite 3s',
         'gradient': 'gradient 15s ease infinite',
+        'pulse-slow': 'pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite',
       },
       keyframes: {
         glow: {
@@ -56,8 +58,8 @@ export default {
           '100%': { boxShadow: '0 0 30px rgba(59, 130, 246, 0.8), 0 0 40px rgba(59, 130, 246, 0.3)' },
         },
         float: {
-          '0%, 100%': { transform: 'translateY(0px)' },
-          '50%': { transform: 'translateY(-20px)' },
+          '0%, 100%': { transform: 'translateY(0px) rotate(0deg)' },
+          '50%': { transform: 'translateY(-20px) rotate(180deg)' },
         },
         gradient: {
           '0%, 100%': { backgroundPosition: '0% 50%' },
@@ -66,6 +68,15 @@ export default {
       },
       backdropBlur: {
         xs: '2px',
+      },
+      backgroundSize: {
+        '300%': '300%',
+      },
+      perspective: {
+        '1000': '1000px',
+      },
+      transformStyle: {
+        'preserve-3d': 'preserve-3d',
       }
     },
   },
