@@ -42,6 +42,29 @@ interface DeploymentStep {
   message?: string;
 }
 
+// Utility function to generate random string
+const generateRandomString = (length: number = 8): string => {
+  const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+  let result = '';
+  for (let i = 0; i < length; i++) {
+    result += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return result;
+};
+
+// Utility function to generate subdomain
+const generateSubdomain = (brandName: string): string => {
+  const cleanBrand = brandName
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, '')
+    .substring(0, 15); // Limit brand part to 15 chars
+  
+  const randomSuffix = generateRandomString(6);
+  const timestamp = Date.now().toString().slice(-4);
+  
+  return `${cleanBrand || 'agent'}-${randomSuffix}-${timestamp}`;
+};
+
 export const Create: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuthStore();
@@ -63,7 +86,7 @@ export const Create: React.FC = () => {
   });
 
   const [faqs, setFaqs] = useState<FAQ[]>([
-    { id: 'faq-1', question: '', answer: '' }
+    { id: `faq-${generateRandomString(8)}`, question: '', answer: '' }
   ]);
 
   // Deployment state
@@ -86,18 +109,13 @@ export const Create: React.FC = () => {
     makeItLive: false,
   });
 
-  // Auto-generate subdomain from brand name
+  // Auto-generate subdomain from brand name with random suffix
   useEffect(() => {
-    if (formData.brandName && !formData.subdomain) {
-      const subdomain = formData.brandName
-        .toLowerCase()
-        .replace(/[^a-z0-9]/g, '-')
-        .replace(/-+/g, '-')
-        .replace(/^-|-$/g, '')
-        .substring(0, 30);
-      setFormData(prev => ({ ...prev, subdomain }));
+    if (formData.brandName) {
+      const newSubdomain = generateSubdomain(formData.brandName);
+      setFormData(prev => ({ ...prev, subdomain: newSubdomain }));
     }
-  }, [formData.brandName, formData.subdomain]);
+  }, [formData.brandName]);
 
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -130,7 +148,7 @@ export const Create: React.FC = () => {
   };
 
   const addFaq = () => {
-    const newId = `faq-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const newId = `faq-${generateRandomString(8)}`;
     setFaqs(prev => [...prev, { id: newId, question: '', answer: '' }]);
   };
 
@@ -193,8 +211,12 @@ export const Create: React.FC = () => {
     try {
       updateDeploymentStep('step-1', 'loading', 'Generating agent code...');
 
+      // Ensure subdomain is generated if not already
+      const finalSubdomain = formData.subdomain || generateSubdomain(formData.brandName);
+
       const config = {
         ...formData,
+        subdomain: finalSubdomain,
         services: formData.services.filter(s => s.trim()),
         faqs: faqs.filter(faq => faq.question.trim() && faq.answer.trim()),
         userId: user.id,
@@ -448,6 +470,30 @@ export const Create: React.FC = () => {
                     required
                   />
                 </div>
+
+                {/* Auto-generated Subdomain Display */}
+                {formData.subdomain && (
+                  <div className="mt-6">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Generated Subdomain
+                    </label>
+                    <div className="flex items-center space-x-2 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                      <code className="text-sm text-gray-600 dark:text-gray-300 flex-1">
+                        {formData.subdomain}
+                      </code>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => copyToClipboard(formData.subdomain)}
+                      >
+                        <Copy className="w-4 h-4" />
+                      </Button>
+                    </div>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                      This unique identifier is automatically generated for your agent
+                    </p>
+                  </div>
+                )}
               </Card>
             </motion.div>
 
@@ -469,7 +515,7 @@ export const Create: React.FC = () => {
 
                 <div className="space-y-4">
                   {formData.services.map((service, index) => (
-                    <div key={`service-${index}`} className="flex items-center space-x-3">
+                    <div key={`service-${index}-${generateRandomString(4)}`} className="flex items-center space-x-3">
                       <Input
                         value={service}
                         onChange={(e) => handleServiceChange(index, e.target.value)}
