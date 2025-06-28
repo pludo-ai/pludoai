@@ -11,12 +11,19 @@ import {
   ArrowRight, 
   Check, 
   Star,
-  Play,
   Sparkles,
   Code,
   Palette,
   MessageSquare,
-  ChevronDown
+  ChevronDown,
+  Brain,
+  Rocket,
+  Users,
+  Award,
+  TrendingUp,
+  Clock,
+  Target,
+  Layers
 } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
@@ -25,102 +32,112 @@ import { Card } from '../components/ui/Card';
 gsap.registerPlugin(ScrollTrigger, TextPlugin);
 
 export const Landing: React.FC = () => {
+  const containerRef = useRef<HTMLDivElement>(null);
   const heroRef = useRef<HTMLDivElement>(null);
-  const videoRef = useRef<HTMLDivElement>(null);
-  const videoElementRef = useRef<HTMLVideoElement>(null);
+  const galleryRef = useRef<HTMLDivElement>(null);
+  const statsRef = useRef<HTMLDivElement>(null);
   const featuresRef = useRef<HTMLDivElement>(null);
-  const stepsRef = useRef<HTMLDivElement>(null);
+  const showcaseRef = useRef<HTMLDivElement>(null);
   const testimonialsRef = useRef<HTMLDivElement>(null);
   const ctaRef = useRef<HTMLDivElement>(null);
-  const titleRef = useRef<HTMLHeadingElement>(null);
-  const subtitleRef = useRef<HTMLParagraphElement>(null);
-  const scrollIndicatorRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const ctx = gsap.context(() => {
-      // Hero section animations
-      const tl = gsap.timeline();
+      // Hero section with premium animations
+      const heroTl = gsap.timeline();
       
-      // Animated title with typewriter effect
-      tl.from(titleRef.current, {
+      heroTl.from(".hero-badge", {
+        opacity: 0,
+        y: 50,
+        duration: 1,
+        ease: "power3.out"
+      })
+      .from(".hero-title", {
         opacity: 0,
         y: 100,
         duration: 1.2,
         ease: "power4.out"
-      })
-      .to(titleRef.current?.querySelector('.highlight'), {
-        backgroundPosition: "200% center",
-        duration: 2,
-        ease: "power2.inOut",
-        repeat: -1,
-        yoyo: true
       }, "-=0.5")
-      .from(subtitleRef.current, {
+      .from(".hero-subtitle", {
         opacity: 0,
         y: 50,
         duration: 1,
         ease: "power3.out"
       }, "-=0.8")
-      .from(".hero-button", {
+      .from(".hero-buttons", {
         opacity: 0,
         y: 30,
         duration: 0.8,
-        stagger: 0.2,
         ease: "back.out(1.7)"
-      }, "-=0.5");
-
-      // Floating particles animation
-      gsap.to(".particle", {
-        y: -100,
+      }, "-=0.5")
+      .from(".hero-stats", {
         opacity: 0,
-        duration: 3,
+        y: 30,
+        duration: 0.8,
+        stagger: 0.1,
+        ease: "power3.out"
+      }, "-=0.3");
+
+      // Floating particles
+      gsap.to(".particle", {
+        y: -200,
+        opacity: 0,
+        duration: 4,
         stagger: {
-          amount: 2,
+          amount: 3,
           from: "random"
         },
         repeat: -1,
         ease: "power2.out"
       });
 
-      // Scroll indicator animation
-      gsap.to(scrollIndicatorRef.current, {
-        y: 10,
-        duration: 1.5,
-        repeat: -1,
-        yoyo: true,
-        ease: "power2.inOut"
-      });
-
-      // Video section - triggered after 50% scroll
+      // Gallery section with masonry-style reveals
       ScrollTrigger.create({
-        trigger: videoRef.current,
+        trigger: galleryRef.current,
         start: "top 80%",
-        end: "bottom 20%",
         onEnter: () => {
-          gsap.fromTo(videoRef.current, 
+          gsap.fromTo(".gallery-item", 
             { 
               opacity: 0, 
               scale: 0.8,
-              rotationY: 15
+              rotationY: 45,
+              z: -100
             },
             { 
               opacity: 1, 
               scale: 1,
               rotationY: 0,
-              duration: 1.5,
-              ease: "power3.out",
-              onComplete: () => {
-                // Auto-play video when it comes into view
-                if (videoElementRef.current) {
-                  videoElementRef.current.play().catch(console.error);
-                }
-              }
+              z: 0,
+              duration: 1.2,
+              stagger: {
+                amount: 2,
+                from: "random"
+              },
+              ease: "power3.out"
             }
           );
         }
       });
 
-      // Features section with stagger animation
+      // Stats counter animation
+      ScrollTrigger.create({
+        trigger: statsRef.current,
+        start: "top 70%",
+        onEnter: () => {
+          gsap.fromTo(".stat-number", 
+            { textContent: 0 },
+            { 
+              textContent: (i, target) => target.getAttribute('data-value'),
+              duration: 2,
+              ease: "power2.out",
+              snap: { textContent: 1 },
+              stagger: 0.2
+            }
+          );
+        }
+      });
+
+      // Features with 3D perspective
       ScrollTrigger.create({
         trigger: featuresRef.current,
         start: "top 70%",
@@ -128,59 +145,38 @@ export const Landing: React.FC = () => {
           gsap.fromTo(".feature-card", 
             { 
               opacity: 0, 
+              rotationX: 60,
               y: 100,
-              rotationX: 45
+              z: -200
             },
             { 
               opacity: 1, 
-              y: 0,
               rotationX: 0,
-              duration: 1,
-              stagger: 0.15,
-              ease: "power3.out"
-            }
-          );
-        }
-      });
-
-      // Steps section with timeline
-      ScrollTrigger.create({
-        trigger: stepsRef.current,
-        start: "top 70%",
-        onEnter: () => {
-          const stepTl = gsap.timeline();
-          stepTl.fromTo(".step-item", 
-            { 
-              opacity: 0, 
-              x: (index) => index % 2 === 0 ? -100 : 100,
-              scale: 0.8
-            },
-            { 
-              opacity: 1, 
-              x: 0,
-              scale: 1,
-              duration: 1.2,
-              stagger: 0.3,
-              ease: "power3.out"
-            }
-          )
-          .fromTo(".step-number", 
-            { 
-              scale: 0,
-              rotation: 180
-            },
-            { 
-              scale: 1,
-              rotation: 0,
-              duration: 0.8,
+              y: 0,
+              z: 0,
+              duration: 1.5,
               stagger: 0.2,
-              ease: "back.out(1.7)"
-            }, "-=1"
+              ease: "power3.out"
+            }
           );
         }
       });
 
-      // Testimonials with 3D effect
+      // Showcase with parallax
+      ScrollTrigger.create({
+        trigger: showcaseRef.current,
+        start: "top bottom",
+        end: "bottom top",
+        scrub: 1,
+        onUpdate: (self) => {
+          gsap.to(".showcase-bg", {
+            yPercent: -50 * self.progress,
+            ease: "none"
+          });
+        }
+      });
+
+      // Testimonials carousel effect
       ScrollTrigger.create({
         trigger: testimonialsRef.current,
         start: "top 70%",
@@ -188,22 +184,22 @@ export const Landing: React.FC = () => {
           gsap.fromTo(".testimonial-card", 
             { 
               opacity: 0, 
-              z: -100,
-              rotationY: 45
+              x: (i) => i % 2 === 0 ? -100 : 100,
+              rotationY: 30
             },
             { 
               opacity: 1, 
-              z: 0,
+              x: 0,
               rotationY: 0,
               duration: 1.2,
-              stagger: 0.2,
+              stagger: 0.3,
               ease: "power3.out"
             }
           );
         }
       });
 
-      // CTA section with magnetic effect
+      // CTA with magnetic effect
       ScrollTrigger.create({
         trigger: ctaRef.current,
         start: "top 80%",
@@ -211,52 +207,48 @@ export const Landing: React.FC = () => {
           gsap.fromTo(ctaRef.current, 
             { 
               opacity: 0, 
-              scale: 0.9
+              scale: 0.9,
+              rotationX: 30
             },
             { 
               opacity: 1, 
               scale: 1,
-              duration: 1,
+              rotationX: 0,
+              duration: 1.5,
               ease: "power3.out"
             }
           );
         }
       });
 
-      // Parallax backgrounds
-      gsap.to(".parallax-bg-1", {
-        yPercent: -50,
-        ease: "none",
-        scrollTrigger: {
-          trigger: ".parallax-bg-1",
-          start: "top bottom",
-          end: "bottom top",
-          scrub: true
-        }
+      // Continuous background animations
+      gsap.to(".bg-gradient-1", {
+        rotation: 360,
+        duration: 20,
+        repeat: -1,
+        ease: "none"
       });
 
-      gsap.to(".parallax-bg-2", {
-        yPercent: -30,
-        ease: "none",
-        scrollTrigger: {
-          trigger: ".parallax-bg-2",
-          start: "top bottom",
-          end: "bottom top",
-          scrub: true
-        }
+      gsap.to(".bg-gradient-2", {
+        rotation: -360,
+        duration: 25,
+        repeat: -1,
+        ease: "none"
       });
 
-      // Smooth scroll reveal for text elements
+      // Text reveals on scroll
       gsap.utils.toArray('.reveal-text').forEach((element: any) => {
         gsap.fromTo(element, 
           { 
             opacity: 0, 
-            y: 50 
+            y: 50,
+            clipPath: "inset(100% 0 0 0)"
           },
           {
             opacity: 1,
             y: 0,
-            duration: 1,
+            clipPath: "inset(0% 0 0 0)",
+            duration: 1.2,
             ease: "power3.out",
             scrollTrigger: {
               trigger: element,
@@ -267,110 +259,143 @@ export const Landing: React.FC = () => {
         );
       });
 
-    }, heroRef);
+    }, containerRef);
 
     return () => ctx.revert();
   }, []);
 
-  const features = [
+  const galleryItems = [
     {
-      icon: <Bot className="w-8 h-8" />,
-      title: "No-Code AI Creation",
-      description: "Build sophisticated AI agents without writing a single line of code. Our intuitive interface makes it simple."
+      type: 'image',
+      src: 'https://images.pexels.com/photos/3861969/pexels-photo-3861969.jpeg?auto=compress&cs=tinysrgb&w=800',
+      title: 'AI-Powered Customer Support',
+      description: 'Intelligent responses that understand context and provide accurate solutions',
+      size: 'large'
     },
     {
-      icon: <Zap className="w-8 h-8" />,
-      title: "Instant Deployment",
-      description: "Deploy your AI agent to the web in seconds. Automatic repository creation and cloud hosting included."
+      type: 'image',
+      src: 'https://images.pexels.com/photos/8386440/pexels-photo-8386440.jpeg?auto=compress&cs=tinysrgb&w=600',
+      title: 'Real-time Analytics',
+      description: 'Track performance and optimize your AI agent',
+      size: 'medium'
+    },
+    {
+      type: 'video',
+      src: '/hero-video.mp4',
+      title: 'Seamless Integration',
+      description: 'Deploy anywhere with a single line of code',
+      size: 'large'
+    },
+    {
+      type: 'image',
+      src: 'https://images.pexels.com/photos/7688336/pexels-photo-7688336.jpeg?auto=compress&cs=tinysrgb&w=600',
+      title: 'Custom Branding',
+      description: 'Match your brand perfectly',
+      size: 'small'
+    },
+    {
+      type: 'image',
+      src: 'https://images.pexels.com/photos/3184465/pexels-photo-3184465.jpeg?auto=compress&cs=tinysrgb&w=800',
+      title: 'Multi-language Support',
+      description: 'Serve customers globally',
+      size: 'medium'
+    },
+    {
+      type: 'image',
+      src: 'https://images.pexels.com/photos/8386434/pexels-photo-8386434.jpeg?auto=compress&cs=tinysrgb&w=600',
+      title: 'Advanced AI Models',
+      description: 'Powered by the latest AI technology',
+      size: 'large'
+    }
+  ];
+
+  const features = [
+    {
+      icon: <Brain className="w-8 h-8" />,
+      title: "Advanced AI Intelligence",
+      description: "Powered by cutting-edge language models for natural, contextual conversations",
+      color: "from-blue-500 to-cyan-500"
+    },
+    {
+      icon: <Rocket className="w-8 h-8" />,
+      title: "Lightning Fast Deployment",
+      description: "From concept to live agent in under 5 minutes with automated infrastructure",
+      color: "from-purple-500 to-pink-500"
     },
     {
       icon: <Palette className="w-8 h-8" />,
-      title: "Full Customization",
-      description: "Brand your agent with custom colors, avatars, and personality. Make it truly yours with our design tools."
-    },
-    {
-      icon: <Globe className="w-8 h-8" />,
-      title: "Embed Anywhere",
-      description: "Add your AI agent to any website with a simple script tag. Works on WordPress, Shopify, and custom sites."
-    },
-    {
-      icon: <MessageSquare className="w-8 h-8" />,
-      title: "Smart Conversations",
-      description: "Powered by advanced AI models, your agent understands context and provides helpful, accurate responses."
+      title: "Pixel-Perfect Customization",
+      description: "Complete control over design, personality, and behavior to match your brand",
+      color: "from-amber-500 to-orange-500"
     },
     {
       icon: <Shield className="w-8 h-8" />,
       title: "Enterprise Security",
-      description: "Your data is secure with enterprise-grade encryption and private repository hosting."
-    }
-  ];
-
-  const steps = [
-    {
-      number: "01",
-      title: "Design Your Agent",
-      description: "Customize appearance, personality, and knowledge base using our intuitive form builder.",
-      icon: "🎨"
+      description: "Bank-level encryption and compliance with SOC2, GDPR, and HIPAA standards",
+      color: "from-green-500 to-emerald-500"
     },
     {
-      number: "02",
-      title: "AI Generation",
-      description: "Our AI crafts the perfect prompts and responses based on your business requirements.",
-      icon: "🤖"
+      icon: <Globe className="w-8 h-8" />,
+      title: "Global Scale",
+      description: "Auto-scaling infrastructure that handles millions of conversations worldwide",
+      color: "from-indigo-500 to-blue-500"
     },
     {
-      number: "03",
-      title: "Auto Deploy",
-      description: "Instantly deployed to repository and cloud with a custom domain and embed code ready to use.",
-      icon: "🚀"
+      icon: <Target className="w-8 h-8" />,
+      title: "Precision Analytics",
+      description: "Deep insights into customer behavior and conversation performance",
+      color: "from-rose-500 to-pink-500"
     }
   ];
 
   const testimonials = [
     {
-      name: "Sarah Chen",
-      role: "E-commerce Owner",
+      name: "Alexandra Chen",
+      role: "CEO, TechFlow",
       avatar: "https://images.pexels.com/photos/415829/pexels-photo-415829.jpeg?auto=compress&cs=tinysrgb&w=64&h=64&dpr=2",
-      content: "Increased customer engagement by 300% after adding our AI assistant. Setup took less than 10 minutes!",
-      rating: 5
+      content: "PLUDO.AI transformed our customer experience overnight. 400% increase in engagement and 70% reduction in support tickets.",
+      rating: 5,
+      company: "TechFlow"
     },
     {
-      name: "Marcus Johnson",
-      role: "SaaS Founder",
+      name: "Marcus Rodriguez",
+      role: "Founder, InnovateLab",
       avatar: "https://images.pexels.com/photos/1040880/pexels-photo-1040880.jpeg?auto=compress&cs=tinysrgb&w=64&h=64&dpr=2",
-      content: "PLUDO.AI saved us months of development. Our support tickets dropped by 60% with our new AI agent.",
-      rating: 5
+      content: "The most sophisticated no-code AI platform I've ever used. Our conversion rates doubled within the first month.",
+      rating: 5,
+      company: "InnovateLab"
     },
     {
-      name: "Lisa Rodriguez",
-      role: "Digital Agency Owner",
+      name: "Sarah Williams",
+      role: "VP Marketing, GrowthCorp",
       avatar: "https://images.pexels.com/photos/1858175/pexels-photo-1858175.jpeg?auto=compress&cs=tinysrgb&w=64&h=64&dpr=2",
-      content: "We've deployed AI agents for 20+ clients. The quality and customization options are incredible.",
-      rating: 5
+      content: "Incredible ROI. We've deployed 50+ AI agents for clients with zero technical issues. Pure magic.",
+      rating: 5,
+      company: "GrowthCorp"
     }
   ];
 
   return (
-    <div className="min-h-screen overflow-x-hidden" ref={heroRef}>
+    <div className="min-h-screen overflow-x-hidden bg-black" ref={containerRef}>
       {/* Hero Section */}
-      <section className="relative min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
-        {/* Animated Background */}
+      <section ref={heroRef} className="relative min-h-screen flex items-center justify-center">
+        {/* Premium Background */}
         <div className="absolute inset-0 overflow-hidden">
-          <div className="parallax-bg-1 absolute inset-0 opacity-20">
-            <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-blue-500 rounded-full blur-3xl animate-pulse"></div>
-            <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-purple-500 rounded-full blur-3xl animate-pulse delay-1000"></div>
-            <div className="absolute top-1/2 left-1/2 w-64 h-64 bg-pink-500 rounded-full blur-3xl animate-pulse delay-2000"></div>
-          </div>
+          <div className="bg-gradient-1 absolute -top-40 -left-40 w-96 h-96 bg-gradient-to-r from-amber-400/20 to-yellow-500/20 rounded-full blur-3xl"></div>
+          <div className="bg-gradient-2 absolute -bottom-40 -right-40 w-80 h-80 bg-gradient-to-r from-silver-400/20 to-gray-300/20 rounded-full blur-3xl"></div>
+          <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-gradient-to-r from-blue-600/10 to-purple-600/10 rounded-full blur-3xl"></div>
           
           {/* Floating Particles */}
-          {[...Array(50)].map((_, i) => (
+          {[...Array(100)].map((_, i) => (
             <div
               key={i}
-              className="particle absolute w-1 h-1 bg-white rounded-full opacity-30"
+              className="particle absolute w-1 h-1 rounded-full"
               style={{
                 left: `${Math.random() * 100}%`,
                 top: `${Math.random() * 100}%`,
-                animationDelay: `${Math.random() * 3}s`
+                background: i % 3 === 0 ? '#FFD700' : i % 3 === 1 ? '#C0C0C0' : '#FFFFFF',
+                opacity: Math.random() * 0.5 + 0.2,
+                animationDelay: `${Math.random() * 4}s`
               }}
             />
           ))}
@@ -378,152 +403,198 @@ export const Landing: React.FC = () => {
 
         {/* Content */}
         <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <div className="space-y-8">
-            {/* Badge */}
-            <div className="inline-flex items-center space-x-2 bg-white/10 backdrop-blur-md px-6 py-3 rounded-full text-white text-sm font-medium border border-white/20 shadow-2xl">
-              <Sparkles className="w-4 h-4" />
-              <span>No-Code AI Agent Generator</span>
+          <div className="space-y-12">
+            {/* Premium Badge */}
+            <div className="hero-badge inline-flex items-center space-x-3 bg-gradient-to-r from-amber-500/20 to-yellow-500/20 backdrop-blur-xl px-8 py-4 rounded-full border border-amber-500/30 shadow-2xl">
+              <div className="w-3 h-3 bg-gradient-to-r from-amber-400 to-yellow-500 rounded-full animate-pulse"></div>
+              <span className="text-amber-200 font-medium tracking-wide">Premium AI Agent Platform</span>
+              <Sparkles className="w-5 h-5 text-amber-400" />
             </div>
 
-            {/* Main Title */}
-            <h1 
-              ref={titleRef}
-              className="text-5xl md:text-7xl lg:text-8xl font-bold text-white leading-tight tracking-tight"
-            >
-              Create{' '}
-              <span className="highlight bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 bg-clip-text text-transparent bg-300% animate-gradient">
-                Intelligent
-              </span>
-              <br />
-              AI Agents in Minutes
-            </h1>
+            {/* Hero Title */}
+            <div className="hero-title space-y-6">
+              <h1 className="text-6xl md:text-8xl lg:text-9xl font-black text-white leading-none tracking-tight">
+                <span className="block">Create</span>
+                <span className="block bg-gradient-to-r from-amber-400 via-yellow-500 to-amber-600 bg-clip-text text-transparent">
+                  Intelligent
+                </span>
+                <span className="block">AI Agents</span>
+              </h1>
+              <div className="text-2xl md:text-3xl text-gray-300 font-light tracking-wide">
+                in <span className="text-amber-400 font-semibold">minutes</span>, not months
+              </div>
+            </div>
 
-            {/* Subtitle */}
-            <p 
-              ref={subtitleRef}
-              className="text-xl md:text-2xl text-gray-300 max-w-4xl mx-auto leading-relaxed font-light"
-            >
-              Build, customize, and deploy AI chatbots for your business without any coding. 
-              From customer support to lead generation, create the perfect AI assistant.
+            {/* Hero Subtitle */}
+            <p className="hero-subtitle text-xl md:text-2xl text-gray-400 max-w-4xl mx-auto leading-relaxed font-light">
+              The world's most advanced no-code platform for creating, customizing, and deploying 
+              AI agents that transform customer experiences and drive business growth.
             </p>
 
-            {/* CTA Buttons */}
-            <div className="flex flex-col sm:flex-row items-center justify-center space-y-4 sm:space-y-0 sm:space-x-6 pt-8">
-              <Link to="/signup" className="hero-button">
+            {/* Hero Buttons */}
+            <div className="hero-buttons flex flex-col sm:flex-row items-center justify-center space-y-6 sm:space-y-0 sm:space-x-8">
+              <Link to="/signup">
                 <Button 
                   size="lg" 
-                  className="px-10 py-4 text-lg bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 shadow-2xl transform hover:scale-105 transition-all duration-300"
+                  className="px-12 py-6 text-xl bg-gradient-to-r from-amber-500 to-yellow-600 hover:from-amber-600 hover:to-yellow-700 text-black font-bold shadow-2xl transform hover:scale-105 transition-all duration-300 border-2 border-amber-400/50"
                 >
                   Start Building Free
-                  <ArrowRight className="w-5 h-5 ml-2" />
+                  <ArrowRight className="w-6 h-6 ml-3" />
                 </Button>
               </Link>
               
-              <button className="hero-button flex items-center space-x-3 text-white hover:text-blue-300 transition-colors group">
-                <div className="w-14 h-14 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center shadow-2xl border border-white/30 group-hover:bg-white/30 transition-all duration-300">
-                  <Play className="w-6 h-6 ml-1" />
+              <button className="flex items-center space-x-4 text-white hover:text-amber-300 transition-colors group">
+                <div className="w-16 h-16 bg-gradient-to-r from-gray-800/80 to-gray-700/80 backdrop-blur-sm rounded-full flex items-center justify-center shadow-2xl border border-gray-600/50 group-hover:border-amber-500/50 transition-all duration-300">
+                  <div className="w-0 h-0 border-l-[8px] border-l-white border-y-[6px] border-y-transparent ml-1"></div>
                 </div>
                 <span className="font-medium text-lg">Watch Demo</span>
               </button>
             </div>
 
-            {/* Trust Indicators */}
-            <div className="pt-12">
-              <p className="text-sm text-gray-400 mb-6">Trusted by 10,000+ businesses worldwide</p>
-              <div className="flex items-center justify-center space-x-12 opacity-60">
-                {[...Array(4)].map((_, i) => (
-                  <div 
-                    key={i}
-                    className="w-28 h-10 bg-white/20 rounded-lg backdrop-blur-sm"
-                  />
-                ))}
-              </div>
+            {/* Hero Stats */}
+            <div className="hero-stats grid grid-cols-2 md:grid-cols-4 gap-8 pt-16">
+              {[
+                { value: "50K+", label: "AI Agents Created" },
+                { value: "99.9%", label: "Uptime Guarantee" },
+                { value: "150+", label: "Countries Served" },
+                { value: "24/7", label: "Expert Support" }
+              ].map((stat, index) => (
+                <div key={index} className="text-center">
+                  <div className="text-3xl md:text-4xl font-bold bg-gradient-to-r from-amber-400 to-yellow-500 bg-clip-text text-transparent">
+                    {stat.value}
+                  </div>
+                  <div className="text-gray-400 text-sm mt-2">{stat.label}</div>
+                </div>
+              ))}
             </div>
           </div>
         </div>
 
         {/* Scroll Indicator */}
-        <div 
-          ref={scrollIndicatorRef}
-          className="absolute bottom-8 left-1/2 transform -translate-x-1/2 z-20"
-        >
-          <div className="flex flex-col items-center space-y-2 text-white/70">
-            <span className="text-sm font-medium">Scroll to explore</span>
+        <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 z-20">
+          <div className="flex flex-col items-center space-y-3 text-gray-400">
+            <span className="text-sm font-medium tracking-wide">Discover More</span>
             <ChevronDown className="w-6 h-6 animate-bounce" />
           </div>
         </div>
       </section>
 
-      {/* Video Section - Triggered after 50% scroll */}
-      <section className="py-32 bg-black relative overflow-hidden">
-        <div className="parallax-bg-2 absolute inset-0 opacity-10">
-          <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-br from-blue-900/20 to-purple-900/20"></div>
-        </div>
-        
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-          <div className="text-center mb-16">
-            <h2 className="reveal-text text-4xl md:text-5xl font-bold text-white mb-6">
-              See the Future of{' '}
-              <span className="bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
-                AI Automation
+      {/* Gallery Section */}
+      <section ref={galleryRef} className="py-32 bg-gradient-to-b from-black to-gray-900 relative">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-20">
+            <h2 className="reveal-text text-5xl md:text-6xl font-bold text-white mb-6">
+              Experience the{' '}
+              <span className="bg-gradient-to-r from-amber-400 to-yellow-500 bg-clip-text text-transparent">
+                Future
               </span>
             </h2>
-            <p className="reveal-text text-xl text-gray-300 max-w-3xl mx-auto">
-              Experience the seamless integration of artificial intelligence into your business workflow
+            <p className="reveal-text text-xl text-gray-400 max-w-3xl mx-auto">
+              Every pixel crafted for perfection. Every interaction designed for delight.
             </p>
           </div>
-          
-          <div 
-            ref={videoRef}
-            className="relative rounded-3xl overflow-hidden shadow-2xl border border-white/10"
-          >
-            <video
-              ref={videoElementRef}
-              className="w-full h-auto"
-              muted
-              loop
-              playsInline
-              preload="metadata"
-              poster="/hero-video-poster.jpg"
-            >
-              <source src="/hero-video.mp4" type="video/mp4" />
-              Your browser does not support the video tag.
-            </video>
-            <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent pointer-events-none"></div>
-            
-            {/* Video overlay with play button for manual control */}
-            <div className="absolute inset-0 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity duration-300">
-              <button
-                onClick={() => {
-                  if (videoElementRef.current) {
-                    if (videoElementRef.current.paused) {
-                      videoElementRef.current.play();
-                    } else {
-                      videoElementRef.current.pause();
-                    }
-                  }
-                }}
-                className="w-20 h-20 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center text-white hover:bg-white/30 transition-all duration-300 border border-white/30"
+
+          {/* Masonry Gallery */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {galleryItems.map((item, index) => (
+              <div
+                key={index}
+                className={`gallery-item group relative overflow-hidden rounded-3xl shadow-2xl border border-gray-800/50 hover:border-amber-500/30 transition-all duration-500 ${
+                  item.size === 'large' ? 'md:col-span-2 lg:row-span-2' :
+                  item.size === 'medium' ? 'lg:row-span-1' : ''
+                }`}
               >
-                <Play className="w-8 h-8 ml-1" />
-              </button>
-            </div>
+                {item.type === 'video' ? (
+                  <video
+                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
+                    autoPlay
+                    muted
+                    loop
+                    playsInline
+                  >
+                    <source src={item.src} type="video/mp4" />
+                  </video>
+                ) : (
+                  <img
+                    src={item.src}
+                    alt={item.title}
+                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
+                  />
+                )}
+                
+                {/* Overlay */}
+                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500">
+                  <div className="absolute bottom-6 left-6 right-6">
+                    <h3 className="text-white text-xl font-bold mb-2">{item.title}</h3>
+                    <p className="text-gray-300 text-sm">{item.description}</p>
+                  </div>
+                </div>
+
+                {/* Gold accent */}
+                <div className="absolute top-4 right-4 w-3 h-3 bg-gradient-to-r from-amber-400 to-yellow-500 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Stats Section with Fixed Background */}
+      <section ref={statsRef} className="py-32 relative">
+        <div className="fixed inset-0 bg-gradient-to-br from-gray-900 via-black to-gray-900" style={{ zIndex: -1 }}></div>
+        
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+          <div className="text-center mb-20">
+            <h2 className="reveal-text text-5xl md:text-6xl font-bold text-white mb-6">
+              Trusted by{' '}
+              <span className="bg-gradient-to-r from-silver-400 to-gray-300 bg-clip-text text-transparent">
+                Industry Leaders
+              </span>
+            </h2>
+          </div>
+
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-12">
+            {[
+              { number: 50000, suffix: "+", label: "Active AI Agents", icon: <Bot className="w-8 h-8" /> },
+              { number: 99, suffix: ".9%", label: "Uptime SLA", icon: <Shield className="w-8 h-8" /> },
+              { number: 2, suffix: "M+", label: "Conversations Daily", icon: <MessageSquare className="w-8 h-8" /> },
+              { number: 150, suffix: "+", label: "Countries", icon: <Globe className="w-8 h-8" /> }
+            ].map((stat, index) => (
+              <div key={index} className="text-center group">
+                <div className="mb-6 flex justify-center">
+                  <div className="p-4 bg-gradient-to-r from-amber-500/20 to-yellow-500/20 rounded-2xl border border-amber-500/30 group-hover:border-amber-400/50 transition-all duration-300">
+                    <div className="text-amber-400">
+                      {stat.icon}
+                    </div>
+                  </div>
+                </div>
+                <div className="text-5xl md:text-6xl font-black text-white mb-3">
+                  <span className="stat-number" data-value={stat.number}>0</span>
+                  <span className="bg-gradient-to-r from-amber-400 to-yellow-500 bg-clip-text text-transparent">{stat.suffix}</span>
+                </div>
+                <div className="text-gray-400 text-lg font-medium">{stat.label}</div>
+              </div>
+            ))}
           </div>
         </div>
       </section>
 
       {/* Features Section */}
-      <section ref={featuresRef} className="py-32 bg-gradient-to-b from-white to-gray-50 dark:from-gray-900 dark:to-gray-800 relative">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <section ref={featuresRef} className="py-32 bg-gradient-to-b from-gray-900 to-black relative overflow-hidden">
+        <div className="absolute inset-0 opacity-10">
+          <div className="absolute top-20 left-20 w-96 h-96 bg-gradient-to-r from-amber-500 to-yellow-500 rounded-full blur-3xl"></div>
+          <div className="absolute bottom-20 right-20 w-80 h-80 bg-gradient-to-r from-silver-400 to-gray-300 rounded-full blur-3xl"></div>
+        </div>
+
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative">
           <div className="text-center mb-20">
-            <h2 className="reveal-text text-4xl md:text-5xl font-bold text-gray-900 dark:text-white mb-6">
-              Everything You Need to Build{' '}
-              <span className="bg-gradient-to-r from-primary-600 to-secondary-600 bg-clip-text text-transparent">
-                Amazing AI Agents
+            <h2 className="reveal-text text-5xl md:text-6xl font-bold text-white mb-6">
+              Engineered for{' '}
+              <span className="bg-gradient-to-r from-amber-400 to-yellow-500 bg-clip-text text-transparent">
+                Excellence
               </span>
             </h2>
-            <p className="reveal-text text-xl text-gray-600 dark:text-gray-300 max-w-3xl mx-auto">
-              From design to deployment, we handle the complexity so you can focus on growing your business.
+            <p className="reveal-text text-xl text-gray-400 max-w-3xl mx-auto">
+              Every feature meticulously crafted to deliver unparalleled performance and user experience.
             </p>
           </div>
 
@@ -532,17 +603,25 @@ export const Landing: React.FC = () => {
               <div
                 key={index}
                 className="feature-card group"
+                style={{ perspective: '1000px' }}
               >
-                <Card className="p-8 h-full bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 hover:shadow-2xl transition-all duration-500 group-hover:scale-105">
-                  <div className="text-primary-600 dark:text-primary-400 mb-6 transform group-hover:scale-110 transition-transform duration-300">
-                    {feature.icon}
+                <Card className="p-8 h-full bg-gradient-to-br from-gray-800/50 to-gray-900/50 backdrop-blur-xl border border-gray-700/50 hover:border-amber-500/30 transition-all duration-500 group-hover:shadow-2xl">
+                  <div className="mb-6">
+                    <div className={`inline-flex p-4 rounded-2xl bg-gradient-to-r ${feature.color} shadow-lg group-hover:scale-110 transition-transform duration-300`}>
+                      <div className="text-white">
+                        {feature.icon}
+                      </div>
+                    </div>
                   </div>
-                  <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
+                  <h3 className="text-2xl font-bold text-white mb-4 group-hover:text-amber-300 transition-colors duration-300">
                     {feature.title}
                   </h3>
-                  <p className="text-gray-600 dark:text-gray-300 leading-relaxed">
+                  <p className="text-gray-400 leading-relaxed group-hover:text-gray-300 transition-colors duration-300">
                     {feature.description}
                   </p>
+                  
+                  {/* Gold accent line */}
+                  <div className="mt-6 h-1 bg-gradient-to-r from-amber-400 to-yellow-500 rounded-full transform scale-x-0 group-hover:scale-x-100 transition-transform duration-500 origin-left"></div>
                 </Card>
               </div>
             ))}
@@ -550,67 +629,76 @@ export const Landing: React.FC = () => {
         </div>
       </section>
 
-      {/* How It Works */}
-      <section ref={stepsRef} className="py-32 bg-gradient-to-b from-gray-50 to-white dark:from-gray-800 dark:to-gray-900 relative overflow-hidden">
-        <div className="absolute inset-0 opacity-5">
-          <div className="absolute top-20 left-20 w-72 h-72 bg-blue-500 rounded-full blur-3xl"></div>
-          <div className="absolute bottom-20 right-20 w-96 h-96 bg-purple-500 rounded-full blur-3xl"></div>
-        </div>
-
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative">
-          <div className="text-center mb-20">
-            <h2 className="reveal-text text-4xl md:text-5xl font-bold text-gray-900 dark:text-white mb-6">
-              How It Works
-            </h2>
-            <p className="reveal-text text-xl text-gray-600 dark:text-gray-300 max-w-3xl mx-auto">
-              Three simple steps to launch your AI agent and start engaging with customers.
-            </p>
-          </div>
-
-          <div className="space-y-24">
-            {steps.map((step, index) => (
-              <div
-                key={index}
-                className={`step-item flex flex-col lg:flex-row items-center space-y-12 lg:space-y-0 lg:space-x-16 ${
-                  index % 2 === 1 ? 'lg:flex-row-reverse lg:space-x-reverse' : ''
-                }`}
-              >
-                <div className="flex-1 space-y-6">
-                  <div className="flex items-center space-x-4">
-                    <div className="step-number w-16 h-16 bg-gradient-to-r from-primary-600 to-secondary-600 rounded-full flex items-center justify-center text-white font-bold text-xl shadow-2xl">
-                      {step.number}
-                    </div>
-                    <h3 className="text-3xl font-bold text-gray-900 dark:text-white">
-                      {step.title}
-                    </h3>
+      {/* Showcase Section with Parallax */}
+      <section ref={showcaseRef} className="py-32 relative overflow-hidden">
+        <div className="showcase-bg absolute inset-0 bg-gradient-to-br from-amber-900/20 to-yellow-900/20"></div>
+        
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
+            <div className="space-y-8">
+              <h2 className="reveal-text text-5xl md:text-6xl font-bold text-white leading-tight">
+                Deploy{' '}
+                <span className="bg-gradient-to-r from-amber-400 to-yellow-500 bg-clip-text text-transparent">
+                  Anywhere
+                </span>
+                <br />
+                Scale{' '}
+                <span className="bg-gradient-to-r from-silver-400 to-gray-300 bg-clip-text text-transparent">
+                  Everywhere
+                </span>
+              </h2>
+              <p className="reveal-text text-xl text-gray-400 leading-relaxed">
+                From startup to enterprise, our platform scales seamlessly with your business. 
+                Deploy on any platform, integrate with any system, serve any audience.
+              </p>
+              <div className="reveal-text space-y-4">
+                {[
+                  "One-click deployment to 150+ platforms",
+                  "Auto-scaling infrastructure handles millions",
+                  "99.9% uptime with global CDN",
+                  "Enterprise-grade security & compliance"
+                ].map((item, index) => (
+                  <div key={index} className="flex items-center space-x-3">
+                    <div className="w-2 h-2 bg-gradient-to-r from-amber-400 to-yellow-500 rounded-full"></div>
+                    <span className="text-gray-300">{item}</span>
                   </div>
-                  <p className="text-lg text-gray-600 dark:text-gray-300 leading-relaxed max-w-lg">
-                    {step.description}
-                  </p>
-                </div>
-                
-                <div className="flex-1">
-                  <div className="w-full h-80 bg-gradient-to-br from-primary-100 to-secondary-100 dark:from-primary-900/20 dark:to-secondary-900/20 rounded-3xl flex items-center justify-center shadow-2xl border border-gray-200/50 dark:border-gray-700/50 backdrop-blur-sm">
-                    <div className="text-8xl transform hover:scale-110 transition-transform duration-300">
-                      {step.icon}
+                ))}
+              </div>
+            </div>
+            
+            <div className="relative">
+              <div className="aspect-square bg-gradient-to-br from-gray-800/50 to-gray-900/50 rounded-3xl border border-gray-700/50 backdrop-blur-xl p-8 shadow-2xl">
+                <div className="grid grid-cols-3 gap-4 h-full">
+                  {[...Array(9)].map((_, i) => (
+                    <div
+                      key={i}
+                      className="bg-gradient-to-br from-amber-500/20 to-yellow-500/20 rounded-xl border border-amber-500/30 flex items-center justify-center"
+                      style={{
+                        animationDelay: `${i * 0.1}s`
+                      }}
+                    >
+                      <div className="w-8 h-8 bg-gradient-to-r from-amber-400 to-yellow-500 rounded-lg opacity-60"></div>
                     </div>
-                  </div>
+                  ))}
                 </div>
               </div>
-            ))}
+            </div>
           </div>
         </div>
       </section>
 
       {/* Testimonials */}
-      <section ref={testimonialsRef} className="py-32 bg-gradient-to-b from-white to-gray-50 dark:from-gray-900 dark:to-gray-800 relative">
+      <section ref={testimonialsRef} className="py-32 bg-gradient-to-b from-black to-gray-900 relative">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-20">
-            <h2 className="reveal-text text-4xl md:text-5xl font-bold text-gray-900 dark:text-white mb-6">
-              Loved by Businesses Worldwide
+            <h2 className="reveal-text text-5xl md:text-6xl font-bold text-white mb-6">
+              What Leaders{' '}
+              <span className="bg-gradient-to-r from-amber-400 to-yellow-500 bg-clip-text text-transparent">
+                Say
+              </span>
             </h2>
-            <p className="reveal-text text-xl text-gray-600 dark:text-gray-300 max-w-3xl mx-auto">
-              See how companies are transforming their customer experience with AI agents.
+            <p className="reveal-text text-xl text-gray-400 max-w-3xl mx-auto">
+              Join the ranks of industry pioneers who've transformed their businesses with AI.
             </p>
           </div>
 
@@ -620,27 +708,30 @@ export const Landing: React.FC = () => {
                 key={index}
                 className="testimonial-card group"
               >
-                <Card className="p-8 h-full bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 hover:shadow-2xl transition-all duration-500 group-hover:scale-105">
+                <Card className="p-8 h-full bg-gradient-to-br from-gray-800/50 to-gray-900/50 backdrop-blur-xl border border-gray-700/50 hover:border-amber-500/30 transition-all duration-500 group-hover:shadow-2xl">
                   <div className="flex items-center mb-6">
                     {[...Array(testimonial.rating)].map((_, i) => (
-                      <Star key={i} className="w-5 h-5 text-yellow-400 fill-current" />
+                      <Star key={i} className="w-5 h-5 text-amber-400 fill-current" />
                     ))}
                   </div>
-                  <blockquote className="text-gray-600 dark:text-gray-300 mb-8 italic text-lg leading-relaxed">
+                  <blockquote className="text-gray-300 mb-8 italic text-lg leading-relaxed group-hover:text-white transition-colors duration-300">
                     "{testimonial.content}"
                   </blockquote>
                   <div className="flex items-center">
                     <img
                       src={testimonial.avatar}
                       alt={testimonial.name}
-                      className="w-14 h-14 rounded-full mr-4 shadow-lg"
+                      className="w-16 h-16 rounded-full mr-4 shadow-lg border-2 border-amber-500/30"
                     />
                     <div>
-                      <div className="font-semibold text-gray-900 dark:text-white text-lg">
+                      <div className="font-bold text-white text-lg">
                         {testimonial.name}
                       </div>
-                      <div className="text-sm text-gray-500 dark:text-gray-400">
+                      <div className="text-amber-400 text-sm font-medium">
                         {testimonial.role}
+                      </div>
+                      <div className="text-gray-500 text-sm">
+                        {testimonial.company}
                       </div>
                     </div>
                   </div>
@@ -651,43 +742,58 @@ export const Landing: React.FC = () => {
         </div>
       </section>
 
-      {/* CTA Section */}
-      <section ref={ctaRef} className="py-32 bg-gradient-to-r from-primary-600 via-purple-600 to-secondary-600 relative overflow-hidden">
-        <div className="absolute inset-0 bg-black/20"></div>
-        <div className="absolute inset-0 opacity-30">
-          <div className="absolute top-0 left-0 w-96 h-96 bg-white rounded-full blur-3xl"></div>
-          <div className="absolute bottom-0 right-0 w-80 h-80 bg-blue-300 rounded-full blur-3xl"></div>
+      {/* Final CTA */}
+      <section ref={ctaRef} className="py-32 relative overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-r from-amber-600 via-yellow-600 to-amber-700"></div>
+        <div className="absolute inset-0 bg-black/40"></div>
+        <div className="absolute inset-0 opacity-20">
+          <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-br from-white/10 to-transparent"></div>
+          <div className="absolute bottom-0 right-0 w-96 h-96 bg-gradient-to-tl from-silver-400/20 to-transparent rounded-full blur-3xl"></div>
         </div>
 
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center relative z-10">
-          <div className="space-y-8">
-            <h2 className="text-4xl md:text-5xl lg:text-6xl font-bold text-white leading-tight">
-              Ready to Transform Your Business?
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 text-center relative z-10">
+          <div className="space-y-12">
+            <h2 className="text-5xl md:text-7xl font-black text-white leading-tight">
+              Ready to Lead the{' '}
+              <span className="text-black">
+                AI Revolution?
+              </span>
             </h2>
-            <p className="text-xl md:text-2xl text-primary-100 max-w-3xl mx-auto leading-relaxed">
-              Join thousands of businesses already using AI agents to provide better customer experiences.
+            <p className="text-2xl text-amber-100 max-w-3xl mx-auto leading-relaxed font-light">
+              Join thousands of visionary businesses already transforming their customer experience with AI.
             </p>
-            <div className="flex flex-col sm:flex-row items-center justify-center space-y-6 sm:space-y-0 sm:space-x-8 pt-8">
+            <div className="flex flex-col sm:flex-row items-center justify-center space-y-6 sm:space-y-0 sm:space-x-8">
               <Link to="/signup">
                 <Button 
                   size="lg" 
-                  className="px-10 py-4 text-lg bg-white text-primary-600 hover:bg-gray-100 shadow-2xl transform hover:scale-105 transition-all duration-300"
+                  className="px-12 py-6 text-xl bg-black text-amber-400 hover:bg-gray-900 shadow-2xl transform hover:scale-105 transition-all duration-300 border-2 border-black font-bold"
                 >
-                  Start Building Now
-                  <ArrowRight className="w-5 h-5 ml-2" />
+                  Start Your Journey
+                  <ArrowRight className="w-6 h-6 ml-3" />
                 </Button>
               </Link>
-              <div className="flex items-center text-primary-100 text-lg">
-                <Check className="w-5 h-5 mr-2" />
-                No credit card required
+              <div className="flex items-center text-amber-100 text-lg font-medium">
+                <Check className="w-6 h-6 mr-3" />
+                Free forever • No credit card required
               </div>
+            </div>
+            
+            {/* Premium guarantee badges */}
+            <div className="flex flex-wrap items-center justify-center gap-8 pt-12">
+              {[
+                { icon: <Award className="w-6 h-6" />, text: "99.9% Uptime SLA" },
+                { icon: <Users className="w-6 h-6" />, text: "24/7 Expert Support" },
+                { icon: <TrendingUp className="w-6 h-6" />, text: "ROI Guaranteed" },
+                { icon: <Clock className="w-6 h-6" />, text: "5-Min Setup" }
+              ].map((badge, index) => (
+                <div key={index} className="flex items-center space-x-2 text-amber-200">
+                  {badge.icon}
+                  <span className="font-medium">{badge.text}</span>
+                </div>
+              ))}
             </div>
           </div>
         </div>
-
-        {/* Floating Elements */}
-        <div className="absolute top-20 left-20 w-24 h-24 bg-white/10 rounded-full animate-float"></div>
-        <div className="absolute bottom-20 right-20 w-20 h-20 bg-white/10 rounded-full animate-float-delayed"></div>
       </section>
     </div>
   );
