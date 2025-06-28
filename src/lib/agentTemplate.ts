@@ -1,4 +1,3 @@
-```typescript
 interface AgentConfig {
   name: string;
   brandName: string;
@@ -20,7 +19,7 @@ export function generateAgentFiles(config: AgentConfig): { path: string; content
     {
       path: 'package.json',
       content: JSON.stringify({
-        name: `${config.brandName.toLowerCase().replace(/[^a-z0-9]/g, '-')}-ai-agent`,
+        name: config.brandName.toLowerCase().replace(/[^a-z0-9]/g, '-') + '-ai-agent',
         version: '1.0.0',
         type: 'module',
         scripts: {
@@ -995,4 +994,3 @@ function hexToHsl(hex: string, lightness: number): string {
   // Convert to HSL string with custom lightness
   return `hsl(${Math.round(h * 360)}, ${Math.round(s * 100)}%, ${lightness}%)`;
 }
-```
