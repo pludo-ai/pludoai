@@ -11,36 +11,21 @@ import {
   Copy,
   Edit,
   Plus,
-  Globe,
-  RefreshCw,
-  Upload
+  Globe
 } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
-import { Input } from '../components/ui/Input';
-import { Textarea } from '../components/ui/Textarea';
 import { useAuthStore } from '../store/authStore';
 import { supabase } from '../lib/supabase';
-import { regenerateAgent, uploadToGitHub, deployToVercel } from '../lib/deployment';
 import toast from 'react-hot-toast';
 
 interface Agent {
   id: string;
   name: string;
   brand_name: string;
-  website_name: string;
   agent_type: string;
-  role_description: string;
-  services: string[];
-  faqs: { question: string; answer: string }[];
-  primary_color: string;
-  tone: string;
-  avatar_url?: string;
-  subdomain: string;
   github_repo?: string;
   vercel_url?: string;
-  office_hours?: string;
-  knowledge: string;
   created_at: string;
   updated_at: string;
 }
@@ -50,8 +35,6 @@ export const Dashboard: React.FC = () => {
   const [activeTab, setActiveTab] = useState('overview');
   const [agents, setAgents] = useState<Agent[]>([]);
   const [loading, setLoading] = useState(true);
-  const [editingAgent, setEditingAgent] = useState<Agent | null>(null);
-  const [redeployLoading, setRedeployLoading] = useState<string | null>(null);
 
   const tabs = [
     { id: 'overview', label: 'Overview', icon: <Bot className="w-4 h-4" /> },
@@ -83,97 +66,6 @@ export const Dashboard: React.FC = () => {
     }
   };
 
-  const handleEditAgent = (agent: Agent) => {
-    setEditingAgent({ ...agent });
-  };
-
-  const handleUpdateAgent = async (updatedAgent: Agent) => {
-    try {
-      const { error } = await supabase
-        .from('agents')
-        .update({
-          name: updatedAgent.name,
-          brand_name: updatedAgent.brand_name,
-          website_name: updatedAgent.website_name,
-          agent_type: updatedAgent.agent_type,
-          role_description: updatedAgent.role_description,
-          services: updatedAgent.services,
-          faqs: updatedAgent.faqs,
-          primary_color: updatedAgent.primary_color,
-          tone: updatedAgent.tone,
-          avatar_url: updatedAgent.avatar_url,
-          office_hours: updatedAgent.office_hours,
-          knowledge: updatedAgent.knowledge,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', updatedAgent.id);
-
-      if (error) throw error;
-
-      // Update local state
-      setAgents(prev => prev.map(agent => 
-        agent.id === updatedAgent.id ? updatedAgent : agent
-      ));
-
-      toast.success('Agent updated successfully!');
-      setEditingAgent(null);
-    } catch (error: any) {
-      toast.error('Failed to update agent: ' + error.message);
-    }
-  };
-
-  const handleRedeploy = async (agent: Agent) => {
-    setRedeployLoading(agent.id);
-    
-    try {
-      toast.loading('Starting redeploy process...', { id: 'redeploy' });
-
-      // Step 1: Regenerate and upload to GitHub
-      const regenResult = await regenerateAgent(agent.id);
-      if (!regenResult.success) {
-        throw new Error(regenResult.error || 'Failed to regenerate agent');
-      }
-
-      toast.loading('Files updated in GitHub...', { id: 'redeploy' });
-
-      // Step 2: Trigger new deployment if Vercel URL exists
-      if (agent.vercel_url && !agent.vercel_url.includes('dashboard')) {
-        // For existing deployments, we just need to push to GitHub
-        // Vercel will auto-deploy via webhook
-        toast.loading('Triggering deployment...', { id: 'redeploy' });
-        
-        // Wait a moment for GitHub webhook to trigger Vercel
-        await new Promise(resolve => setTimeout(resolve, 5000));
-        
-        toast.success('Agent redeployed successfully! Changes will be live in a few minutes.', { id: 'redeploy' });
-      } else {
-        // If no Vercel URL, deploy fresh
-        const deployResult = await deployToVercel(agent.id);
-        if (!deployResult.success) {
-          throw new Error(deployResult.error || 'Failed to deploy to Vercel');
-        }
-
-        // Update local state with new Vercel URL
-        if (deployResult.vercelUrl) {
-          setAgents(prev => prev.map(a => 
-            a.id === agent.id ? { ...a, vercel_url: deployResult.vercelUrl } : a
-          ));
-        }
-
-        toast.success('Agent redeployed successfully!', { id: 'redeploy' });
-      }
-
-      // Refresh agents list
-      await fetchAgents();
-
-    } catch (error: any) {
-      console.error('Redeploy error:', error);
-      toast.error(error.message || 'Failed to redeploy agent', { id: 'redeploy' });
-    } finally {
-      setRedeployLoading(null);
-    }
-  };
-
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
     toast.success('Copied to clipboard!');
@@ -192,269 +84,7 @@ export const Dashboard: React.FC = () => {
     }
   };
 
-  const addFAQ = (agent: Agent) => {
-    const newFAQ = { question: '', answer: '' };
-    setEditingAgent({
-      ...agent,
-      faqs: [...agent.faqs, newFAQ]
-    });
-  };
-
-  const removeFAQ = (agent: Agent, index: number) => {
-    setEditingAgent({
-      ...agent,
-      faqs: agent.faqs.filter((_, i) => i !== index)
-    });
-  };
-
-  const updateFAQ = (agent: Agent, index: number, field: 'question' | 'answer', value: string) => {
-    const updatedFAQs = [...agent.faqs];
-    updatedFAQs[index] = { ...updatedFAQs[index], [field]: value };
-    setEditingAgent({
-      ...agent,
-      faqs: updatedFAQs
-    });
-  };
-
-  const addService = (agent: Agent) => {
-    setEditingAgent({
-      ...agent,
-      services: [...agent.services, '']
-    });
-  };
-
-  const removeService = (agent: Agent, index: number) => {
-    setEditingAgent({
-      ...agent,
-      services: agent.services.filter((_, i) => i !== index)
-    });
-  };
-
-  const updateService = (agent: Agent, index: number, value: string) => {
-    const updatedServices = [...agent.services];
-    updatedServices[index] = value;
-    setEditingAgent({
-      ...agent,
-      services: updatedServices
-    });
-  };
-
-  const renderEditForm = (agent: Agent) => {
-    return (
-      <Card className="p-6">
-        <div className="flex items-center justify-between mb-6">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-            Edit Agent: {agent.name}
-          </h3>
-          <div className="flex space-x-2">
-            <Button
-              variant="outline"
-              onClick={() => setEditingAgent(null)}
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={() => handleUpdateAgent(agent)}
-            >
-              Save Changes
-            </Button>
-          </div>
-        </div>
-
-        <div className="space-y-6">
-          {/* Basic Information */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Input
-              label="Agent Name"
-              value={agent.name}
-              onChange={(e) => setEditingAgent({ ...agent, name: e.target.value })}
-              placeholder="e.g., Sarah"
-            />
-            <Input
-              label="Brand Name"
-              value={agent.brand_name}
-              onChange={(e) => setEditingAgent({ ...agent, brand_name: e.target.value })}
-              placeholder="e.g., TechCorp Inc."
-            />
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Input
-              label="Website Name"
-              value={agent.website_name}
-              onChange={(e) => setEditingAgent({ ...agent, website_name: e.target.value })}
-              placeholder="e.g., TechCorp Website"
-            />
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Agent Type
-              </label>
-              <select
-                value={agent.agent_type}
-                onChange={(e) => setEditingAgent({ ...agent, agent_type: e.target.value })}
-                className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white/80 dark:bg-gray-800/80 px-3 py-2 text-gray-900 dark:text-white"
-              >
-                <option value="customer-support">Customer Support</option>
-                <option value="sales-assistant">Sales Assistant</option>
-                <option value="lead-generation">Lead Generation</option>
-                <option value="product-guide">Product Guide</option>
-                <option value="booking-assistant">Booking Assistant</option>
-                <option value="general-assistant">General Assistant</option>
-              </select>
-            </div>
-          </div>
-
-          <Textarea
-            label="Role Description"
-            value={agent.role_description}
-            onChange={(e) => setEditingAgent({ ...agent, role_description: e.target.value })}
-            placeholder="Describe what your agent does..."
-            rows={3}
-          />
-
-          {/* Services */}
-          <div>
-            <div className="flex items-center justify-between mb-3">
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                Services Offered
-              </label>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => addService(agent)}
-              >
-                <Plus className="w-4 h-4 mr-1" />
-                Add Service
-              </Button>
-            </div>
-            <div className="space-y-2">
-              {agent.services.map((service, index) => (
-                <div key={index} className="flex items-center space-x-2">
-                  <Input
-                    value={service}
-                    onChange={(e) => updateService(agent, index, e.target.value)}
-                    placeholder="Service description"
-                    className="flex-1"
-                  />
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => removeService(agent, index)}
-                    className="text-red-600 hover:text-red-700"
-                  >
-                    Remove
-                  </Button>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* FAQs */}
-          <div>
-            <div className="flex items-center justify-between mb-3">
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                Frequently Asked Questions
-              </label>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => addFAQ(agent)}
-              >
-                <Plus className="w-4 h-4 mr-1" />
-                Add FAQ
-              </Button>
-            </div>
-            <div className="space-y-4">
-              {agent.faqs.map((faq, index) => (
-                <div key={index} className="border border-gray-200 dark:border-gray-700 rounded-lg p-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                      FAQ #{index + 1}
-                    </span>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => removeFAQ(agent, index)}
-                      className="text-red-600 hover:text-red-700"
-                    >
-                      Remove
-                    </Button>
-                  </div>
-                  <div className="space-y-2">
-                    <Input
-                      placeholder="Question"
-                      value={faq.question}
-                      onChange={(e) => updateFAQ(agent, index, 'question', e.target.value)}
-                    />
-                    <Textarea
-                      placeholder="Answer"
-                      value={faq.answer}
-                      onChange={(e) => updateFAQ(agent, index, 'answer', e.target.value)}
-                      rows={2}
-                    />
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Customization */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Input
-              label="Primary Color"
-              type="color"
-              value={agent.primary_color}
-              onChange={(e) => setEditingAgent({ ...agent, primary_color: e.target.value })}
-            />
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Tone
-              </label>
-              <select
-                value={agent.tone}
-                onChange={(e) => setEditingAgent({ ...agent, tone: e.target.value })}
-                className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white/80 dark:bg-gray-800/80 px-3 py-2 text-gray-900 dark:text-white"
-              >
-                <option value="professional">Professional</option>
-                <option value="friendly">Friendly</option>
-                <option value="witty">Witty</option>
-                <option value="minimal">Minimal</option>
-              </select>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Input
-              label="Avatar URL (optional)"
-              value={agent.avatar_url || ''}
-              onChange={(e) => setEditingAgent({ ...agent, avatar_url: e.target.value })}
-              placeholder="https://example.com/avatar.jpg"
-            />
-            <Input
-              label="Office Hours (optional)"
-              value={agent.office_hours || ''}
-              onChange={(e) => setEditingAgent({ ...agent, office_hours: e.target.value })}
-              placeholder="e.g., Mon-Fri 9AM-5PM EST"
-            />
-          </div>
-
-          <Textarea
-            label="Knowledge Base"
-            value={agent.knowledge}
-            onChange={(e) => setEditingAgent({ ...agent, knowledge: e.target.value })}
-            placeholder="Additional information for your agent..."
-            rows={6}
-          />
-        </div>
-      </Card>
-    );
-  };
-
   const renderTabContent = () => {
-    if (editingAgent) {
-      return renderEditForm(editingAgent);
-    }
-
     switch (activeTab) {
       case 'overview':
         return (
@@ -589,26 +219,11 @@ export const Dashboard: React.FC = () => {
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => handleEditAgent(agent)}
+                          onClick={() => window.location.href = '/create'}
                           className="flex items-center"
                         >
                           <Edit className="w-4 h-4 mr-1" />
                           Edit
-                        </Button>
-
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleRedeploy(agent)}
-                          disabled={redeployLoading === agent.id}
-                          className="flex items-center"
-                        >
-                          {redeployLoading === agent.id ? (
-                            <RefreshCw className="w-4 h-4 mr-1 animate-spin" />
-                          ) : (
-                            <Upload className="w-4 h-4 mr-1" />
-                          )}
-                          Redeploy
                         </Button>
                       </div>
                     </div>
@@ -627,34 +242,13 @@ export const Dashboard: React.FC = () => {
             </h3>
             <div className="space-y-4">
               <p className="text-gray-600 dark:text-gray-300">
-                Select an agent from the overview to edit its settings, or use the "Edit" button 
-                next to any agent in the list above.
+                Agent configuration settings will be available here. You can update your agent's
+                information, personality, and behavior.
               </p>
-              {agents.length > 0 && (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {agents.map((agent) => (
-                    <Card key={agent.id} className="p-4 cursor-pointer hover:shadow-lg transition-shadow" onClick={() => handleEditAgent(agent)}>
-                      <div className="flex items-center space-x-3 mb-3">
-                        <div className="w-8 h-8 bg-gradient-to-r from-primary-500 to-secondary-500 rounded-full flex items-center justify-center">
-                          <Bot className="w-4 h-4 text-white" />
-                        </div>
-                        <div>
-                          <div className="font-medium text-gray-900 dark:text-white text-sm">
-                            {agent.name}
-                          </div>
-                          <div className="text-xs text-gray-500 dark:text-gray-400">
-                            {agent.brand_name}
-                          </div>
-                        </div>
-                      </div>
-                      <Button variant="outline" size="sm" className="w-full">
-                        <Edit className="w-4 h-4 mr-1" />
-                        Edit Settings
-                      </Button>
-                    </Card>
-                  ))}
-                </div>
-              )}
+              <Button variant="outline">
+                <Edit className="w-4 h-4 mr-2" />
+                Edit Agent Settings
+              </Button>
             </div>
           </Card>
         );
@@ -667,13 +261,15 @@ export const Dashboard: React.FC = () => {
             </h3>
             <div className="space-y-4">
               <p className="text-gray-600 dark:text-gray-300">
-                The Memory Editor allows you to update your agent's knowledge base. This feature 
-                is integrated into the agent editing form. Use the "Edit" button next to any agent 
-                to modify its knowledge base and other settings.
+                Add or edit your agent's knowledge base. This information will be used to 
+                provide more accurate and personalized responses.
               </p>
-              <Button variant="outline" onClick={() => setActiveTab('settings')}>
-                <Brain className="w-4 h-4 mr-2" />
-                Go to Agent Settings
+              <textarea
+                className="w-full h-64 p-4 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                placeholder="Add knowledge entries here..."
+              />
+              <Button>
+                Update Knowledge Base
               </Button>
             </div>
           </Card>
@@ -686,64 +282,52 @@ export const Dashboard: React.FC = () => {
               Embed Your Agent
             </h3>
             <div className="space-y-6">
-              {agents.length > 0 && agents.some(a => a.vercel_url && !a.vercel_url.includes('dashboard')) ? (
+              {agents.length > 0 && agents[0].vercel_url && !agents[0].vercel_url.includes('dashboard') ? (
                 <>
-                  {agents.filter(a => a.vercel_url && !a.vercel_url.includes('dashboard')).map((agent) => (
-                    <div key={agent.id} className="border border-gray-200 dark:border-gray-700 rounded-lg p-4">
-                      <h4 className="font-medium text-gray-900 dark:text-white mb-4">
-                        {agent.name} - {agent.brand_name}
-                      </h4>
-                      
-                      <div className="space-y-4">
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                            Embed Code
-                          </label>
-                          <div className="relative">
-                            <pre className="bg-gray-100 dark:bg-gray-800 p-4 rounded-lg text-sm font-mono overflow-x-auto">
-                              {`<script src="${agent.vercel_url}/float.js" defer></script>`}
-                            </pre>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => copyToClipboard(`<script src="${agent.vercel_url}/float.js" defer></script>`)}
-                              className="absolute top-2 right-2"
-                            >
-                              <Copy className="w-4 h-4" />
-                            </Button>
-                          </div>
-                        </div>
-
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                            Direct Link
-                          </label>
-                          <div className="flex items-center space-x-2">
-                            <input
-                              type="text"
-                              value={agent.vercel_url}
-                              readOnly
-                              className="flex-1 p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-white text-sm"
-                            />
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => copyToClipboard(agent.vercel_url!)}
-                            >
-                              <Copy className="w-4 h-4" />
-                            </Button>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handlePreview(agent.vercel_url!)}
-                            >
-                              <ExternalLink className="w-4 h-4" />
-                            </Button>
-                          </div>
-                        </div>
-                      </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Embed Code
+                    </label>
+                    <div className="relative">
+                      <pre className="bg-gray-100 dark:bg-gray-800 p-4 rounded-lg text-sm font-mono overflow-x-auto">
+                        {`<script src="${agents[0].vercel_url}/float.js" defer></script>`}
+                      </pre>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => copyToClipboard(`<script src="${agents[0].vercel_url}/float.js" defer></script>`)}
+                        className="absolute top-2 right-2"
+                      >
+                        <Copy className="w-4 h-4" />
+                      </Button>
                     </div>
-                  ))}
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Direct Link
+                    </label>
+                    <div className="flex items-center space-x-2">
+                      <input
+                        type="text"
+                        value={agents[0].vercel_url}
+                        readOnly
+                        className="flex-1 p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-white"
+                      />
+                      <Button
+                        variant="outline"
+                        onClick={() => copyToClipboard(agents[0].vercel_url!)}
+                      >
+                        <Copy className="w-4 h-4" />
+                      </Button>
+                      <Button
+                        variant="outline"
+                        onClick={() => handlePreview(agents[0].vercel_url!)}
+                      >
+                        <ExternalLink className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </div>
 
                   <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg">
                     <h4 className="font-medium text-blue-900 dark:text-blue-200 mb-2">
@@ -816,7 +400,7 @@ export const Dashboard: React.FC = () => {
           {/* Main Content */}
           <div className="flex-1">
             <motion.div
-              key={activeTab + (editingAgent ? '-editing' : '')}
+              key={activeTab}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.3 }}
