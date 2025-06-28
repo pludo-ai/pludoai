@@ -101,7 +101,7 @@ function App() {
     <Router>
       <div className="min-h-screen bg-white dark:bg-gray-900 transition-colors">
         <Navbar />
-        <main className="pt-16">
+        <main className="pt-24">
           <Routes>
             <Route path="/" element={<Landing />} />
             <Route path="/login" element={<Login />} />
