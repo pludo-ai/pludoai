@@ -104,7 +104,7 @@ class GitHubService {
     
     try {
       // Wait longer for repository to be fully ready since we're auto-initializing
-      await new Promise(resolve => setTimeout(resolve, 15000));
+      await new Promise(resolve => setTimeout(resolve, 3000));
 
       // Get the default branch and current commit
       let defaultBranch = 'main';
