@@ -27,6 +27,7 @@ gsap.registerPlugin(ScrollTrigger, TextPlugin);
 export const Landing: React.FC = () => {
   const heroRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLDivElement>(null);
+  const videoElementRef = useRef<HTMLVideoElement>(null);
   const featuresRef = useRef<HTMLDivElement>(null);
   const stepsRef = useRef<HTMLDivElement>(null);
   const testimonialsRef = useRef<HTMLDivElement>(null);
@@ -107,7 +108,13 @@ export const Landing: React.FC = () => {
               scale: 1,
               rotationY: 0,
               duration: 1.5,
-              ease: "power3.out"
+              ease: "power3.out",
+              onComplete: () => {
+                // Auto-play video when it comes into view
+                if (videoElementRef.current) {
+                  videoElementRef.current.play().catch(console.error);
+                }
+              }
             }
           );
         }
@@ -469,16 +476,38 @@ export const Landing: React.FC = () => {
           <div 
             ref={videoRef}
             className="relative rounded-3xl overflow-hidden shadow-2xl border border-white/10"
-            style={{ paddingBottom: '56.25%', height: 0 }}
           >
-            <iframe
-              src="https://streamable.com/e/k5toe4?autoplay=1&nocontrols=1"
-              className="absolute top-0 left-0 w-full h-full"
-              style={{ border: 'none' }}
-              allow="autoplay; fullscreen"
-              allowFullScreen
-            />
+            <video
+              ref={videoElementRef}
+              className="w-full h-auto"
+              muted
+              loop
+              playsInline
+              preload="metadata"
+              poster="/hero-video-poster.jpg"
+            >
+              <source src="/hero-video.mp4" type="video/mp4" />
+              Your browser does not support the video tag.
+            </video>
             <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent pointer-events-none"></div>
+            
+            {/* Video overlay with play button for manual control */}
+            <div className="absolute inset-0 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity duration-300">
+              <button
+                onClick={() => {
+                  if (videoElementRef.current) {
+                    if (videoElementRef.current.paused) {
+                      videoElementRef.current.play();
+                    } else {
+                      videoElementRef.current.pause();
+                    }
+                  }
+                }}
+                className="w-20 h-20 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center text-white hover:bg-white/30 transition-all duration-300 border border-white/30"
+              >
+                <Play className="w-8 h-8 ml-1" />
+              </button>
+            </div>
           </div>
         </div>
       </section>
