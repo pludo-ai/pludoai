@@ -12,9 +12,10 @@ interface AgentConfig {
   subdomain: string;
   officeHours?: string;
   knowledge: string;
+  vercelUrl?: string; // Add vercelUrl to config
 }
 
-export function generateAgentFiles(config: AgentConfig): { path: string; content: string }[] {
+export function generateAgentFiles(config: AgentConfig, vercelUrl?: string): { path: string; content: string }[] {
   const files = [
     {
       path: 'package.json',
@@ -245,7 +246,7 @@ body {
     },
     {
       path: 'public/widget.js',
-      content: generateWidgetScript(config)
+      content: generateWidgetScript(config, vercelUrl)
     },
     {
       path: 'public/vite.svg',
@@ -515,7 +516,6 @@ function FloatingWidget() {
       left: 0, 
       width: '100vw', 
       height: '100vh', 
-      pointerEvents: 'none', 
       zIndex: 2147483647 
     }}>
       <FloatingButton onClick={() => setIsOpen(true)} />
@@ -1050,7 +1050,10 @@ function generateConfigFile(config: AgentConfig): string {
 export default agentConfig;`;
 }
 
-function generateWidgetScript(config: AgentConfig): string {
+function generateWidgetScript(config: AgentConfig, vercelUrl?: string): string {
+  // Use the provided vercelUrl or fall back to a placeholder that will be replaced during deployment
+  const baseUrl = vercelUrl || '{{VERCEL_URL}}';
+  
   return `(function() {
   'use strict';
   
@@ -1061,11 +1064,33 @@ function generateWidgetScript(config: AgentConfig): string {
   // Configuration
   const config = ${JSON.stringify(config)};
   
+  // Get the base URL for the widget
+  const getWidgetBaseUrl = () => {
+    // If we have a hardcoded vercel URL, use it
+    const hardcodedUrl = '${baseUrl}';
+    if (hardcodedUrl && hardcodedUrl !== '{{VERCEL_URL}}') {
+      return hardcodedUrl;
+    }
+    
+    // Fallback: try to determine from script src
+    const scripts = document.getElementsByTagName('script');
+    for (let script of scripts) {
+      if (script.src && script.src.includes('widget.js')) {
+        const url = new URL(script.src);
+        return url.origin;
+      }
+    }
+    
+    // Last resort: use current origin (this will likely fail for embedded widgets)
+    console.warn('Could not determine widget base URL, using current origin');
+    return window.location.origin;
+  };
+  
   // Create iframe for floating widget
   function createFloatingWidget() {
     const iframe = document.createElement('iframe');
     iframe.id = 'pludo-ai-widget';
-    iframe.src = window.location.origin + '/widget.html';
+    iframe.src = getWidgetBaseUrl() + '/widget.html';
     iframe.style.cssText = \`
       position: fixed !important;
       top: 0 !important;
