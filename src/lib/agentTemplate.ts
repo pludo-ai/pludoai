@@ -217,7 +217,8 @@ body {
   padding: 0;
   font-family: 'Inter', system-ui, sans-serif;
 }
-      /* Ensure floating widget is always clickable */
+
+/* Ensure floating widget is always clickable */
 #widget-root {
   position: relative;
   z-index: 2147483647;
@@ -228,7 +229,7 @@ body {
 }
 
 /* Force pointer events for floating button */
-#widget-root button[style*="cursor: pointer"] {
+#widget-root button {
   pointer-events: auto !important;
   cursor: pointer !important;
 }
@@ -1119,47 +1120,27 @@ function generateWidgetScript(config: AgentConfig, vercelUrl?: string): string {
       height: 100vh !important;
       border: none !important;
       z-index: 2147483647 !important;
-      pointer-events: auto !important;
+      pointer-events: none !important;
       background: transparent !important;
     \`;
-    // Add event listener to handle pointer events intelligently
+    
+    // Override pointer events for the iframe content after load
     iframe.addEventListener('load', function() {
-      try {
-        // Try to access iframe content to set up pointer events
-        const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
-        if (iframeDoc) {
-          // Add CSS to ensure the floating button is always clickable
-          const style = iframeDoc.createElement('style');
-          style.textContent = `
-            #widget-root {
-              position: relative;
-              z-index: 2147483647;
-            }
-            #widget-root * {
-              box-sizing: border-box;
-            }
-            /* Ensure floating button container is always clickable */
-            #widget-root > div:first-child {
-              pointer-events: auto !important;
-              cursor: pointer !important;
-            }
-            /* Make sure the button itself is clickable */
-            #widget-root button, #widget-root [style*="cursor: pointer"] {
-              pointer-events: auto !important;
-              cursor: pointer !important;
-            }
-            /* Ensure proper stacking context */
-            #widget-root > div {
-              position: relative;
-              z-index: 2147483647;
-            }
-          `;
-          iframeDoc.head.appendChild(style);
+      // Set pointer events to auto for the iframe itself when needed
+      iframe.style.pointerEvents = 'auto';
+      
+      // Add message listener for iframe communication
+      window.addEventListener('message', function(event) {
+        if (event.source === iframe.contentWindow) {
+          if (event.data.type === 'WIDGET_BUTTON_CLICK') {
+            // Ensure iframe can receive clicks
+            iframe.style.pointerEvents = 'auto';
+          } else if (event.data.type === 'WIDGET_CLOSED') {
+            // Reset pointer events when widget is closed
+            iframe.style.pointerEvents = 'none';
+          }
         }
-      } catch (e) {
-        // Cross-origin restrictions might prevent this
-        console.log('Widget iframe loaded (cross-origin restrictions may apply)');
-      }
+      });
     });
 
     return iframe;
