@@ -43,6 +43,7 @@ class GitHubService {
         'Accept': 'application/vnd.github.v3+json',
         'Content-Type': 'application/json',
         'User-Agent': 'PLUDO-AI-Agent-Generator',
+        'X-GitHub-Api-Version': '2022-11-28',
         ...options.headers,
       },
     });
@@ -103,7 +104,12 @@ class GitHubService {
     console.log(`Starting upload of ${files.length} files to ${repoFullName}`);
     
     try {
-      // Wait longer for repository to be fully ready since we're auto-initializing
+      // First, verify we can access the repository
+      console.log('Verifying repository access...');
+      const repo = await this.request(`/repos/${repoFullName}`);
+      console.log('✅ Repository access verified:', repo.name);
+
+      // Wait for repository to be fully ready
       await new Promise(resolve => setTimeout(resolve, 3000));
 
       // Get the default branch and current commit
@@ -112,26 +118,71 @@ class GitHubService {
       let baseTreeSha = null;
       
       try {
+        console.log('Checking for main branch...');
         const ref = await this.request(`/repos/${repoFullName}/git/ref/heads/main`);
         parentCommitSha = ref.object.sha;
         
         // Get the tree for the current commit
         const commit = await this.request(`/repos/${repoFullName}/git/commits/${parentCommitSha}`);
         baseTreeSha = commit.tree.sha;
-        console.log(`Found existing main branch with commit: ${parentCommitSha}`);
+        console.log(`✅ Found main branch with commit: ${parentCommitSha}`);
       } catch (error) {
         // If main doesn't exist, try master
         try {
+          console.log('Main branch not found, checking for master branch...');
           const ref = await this.request(`/repos/${repoFullName}/git/ref/heads/master`);
           defaultBranch = 'master';
           parentCommitSha = ref.object.sha;
           
           const commit = await this.request(`/repos/${repoFullName}/git/commits/${parentCommitSha}`);
           baseTreeSha = commit.tree.sha;
-          console.log(`Found existing master branch with commit: ${parentCommitSha}`);
+          console.log(`✅ Found master branch with commit: ${parentCommitSha}`);
         } catch (masterError) {
-          console.log('No existing branches found, this should not happen with auto_init=true');
-          throw new Error('Repository was not properly initialized. Please try again.');
+          console.log('No existing branches found, creating initial commit...');
+          
+          // Create initial commit if no branches exist
+          const initialBlob = await this.request(`/repos/${repoFullName}/git/blobs`, {
+            method: 'POST',
+            body: JSON.stringify({
+              content: this.utf8ToBase64('# Initial commit\n\nThis repository was created by PLUDO.AI'),
+              encoding: 'base64',
+            }),
+          });
+
+          const initialTree = await this.request(`/repos/${repoFullName}/git/trees`, {
+            method: 'POST',
+            body: JSON.stringify({
+              tree: [{
+                path: 'README.md',
+                mode: '100644',
+                type: 'blob',
+                sha: initialBlob.sha
+              }]
+            }),
+          });
+
+          const initialCommit = await this.request(`/repos/${repoFullName}/git/commits`, {
+            method: 'POST',
+            body: JSON.stringify({
+              message: 'Initial commit',
+              tree: initialTree.sha,
+              parents: []
+            }),
+          });
+
+          // Create main branch
+          await this.request(`/repos/${repoFullName}/git/refs`, {
+            method: 'POST',
+            body: JSON.stringify({
+              ref: 'refs/heads/main',
+              sha: initialCommit.sha
+            }),
+          });
+
+          parentCommitSha = initialCommit.sha;
+          baseTreeSha = initialTree.sha;
+          defaultBranch = 'main';
+          console.log('✅ Created initial commit and main branch');
         }
       }
 
@@ -225,16 +276,16 @@ class GitHubService {
       console.error('GitHub upload failed:', error);
       
       // Provide more specific error messages
-      if (error.message.includes('422')) {
+      if (error.message.includes('401')) {
+        throw new Error('GitHub authentication failed. The token may be invalid, expired, or lack proper permissions. Please ensure the token has "repo" scope.');
+      } else if (error.message.includes('403')) {
+        throw new Error('GitHub access forbidden. This could be due to rate limiting or insufficient permissions. Please try again later.');
+      } else if (error.message.includes('404')) {
+        throw new Error('Repository not found. It may have been deleted or you may not have access to it.');
+      } else if (error.message.includes('422')) {
         throw new Error('Repository validation failed. Please check if the repository name is valid and you have proper permissions.');
       } else if (error.message.includes('409')) {
         throw new Error('Repository conflict detected. The repository may already exist or there may be a naming conflict.');
-      } else if (error.message.includes('403')) {
-        throw new Error('Access forbidden. Please ensure your GitHub token has the required "repo" permissions.');
-      } else if (error.message.includes('401')) {
-        throw new Error('Authentication failed. Please check if your GitHub token is valid and not expired.');
-      } else if (error.message.includes('404')) {
-        throw new Error('Repository not found. It may have been deleted or you may not have access to it.');
       }
       
       throw error;
@@ -266,6 +317,40 @@ class GitHubService {
       return await this.request(`/repos/${repoFullName}/contents/${path}`);
     } catch (error) {
       return [];
+    }
+  }
+
+  // Helper method to verify token permissions
+  async verifyTokenPermissions(): Promise<{ valid: boolean; scopes: string[]; error?: string }> {
+    try {
+      const response = await fetch(`${this.baseUrl}/user`, {
+        headers: {
+          'Authorization': `Bearer ${this.token}`,
+          'Accept': 'application/vnd.github.v3+json',
+          'User-Agent': 'PLUDO-AI-Agent-Generator',
+        },
+      });
+
+      if (!response.ok) {
+        return {
+          valid: false,
+          scopes: [],
+          error: `Token validation failed: ${response.status} ${response.statusText}`
+        };
+      }
+
+      const scopes = response.headers.get('X-OAuth-Scopes')?.split(', ') || [];
+      
+      return {
+        valid: true,
+        scopes,
+      };
+    } catch (error) {
+      return {
+        valid: false,
+        scopes: [],
+        error: error.message
+      };
     }
   }
 }
