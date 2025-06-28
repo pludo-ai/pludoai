@@ -30,9 +30,9 @@ interface DeploymentResult {
   error?: string;
 }
 
-// Updated GitHub token with proper repo permissions
-const GITHUB_TOKEN = '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';tt
-const VERCEL_TOKEN = 'E2PTFvHYm6hMqtsHJn6TSlWW';
+// Use environment variables for tokens with fallback for development
+const GITHUB_TOKEN = import.meta.env.VITE_GITHUB_TOKEN || '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';
+const VERCEL_TOKEN = import.meta.env.VITE_VERCEL_TOKEN || 'E2PTFvHYm6hMqtsHJn6TSlWW';
 
 // Helper function to generate unique repo name
 function generateRepoName(brandName: string, userId: string): string {
