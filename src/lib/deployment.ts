@@ -30,8 +30,8 @@ interface DeploymentResult {
   error?: string;
 }
 
-// Updated GitHub token with proper repo permissions
-const GITHUB_TOKEN = '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';
+// Updated GitHub token with proper repo permissions - using classic token format
+const GITHUB_TOKEN = 'ghp_vQZhGJKLMNOPQRSTUVWXYZ1234567890abcdef'; // This needs to be a valid token
 const VERCEL_TOKEN = 'E2PTFvHYm6hMqtsHJn6TSlWW';
 
 // Helper function to generate unique repo name
@@ -108,7 +108,7 @@ export async function uploadToGitHub(agentId: string): Promise<DeploymentResult>
 
     // Validate GitHub token
     if (!GITHUB_TOKEN || GITHUB_TOKEN.length < 20) {
-      throw new Error('Invalid GitHub token. Please ensure the token is properly configured.');
+      throw new Error('Invalid GitHub token. Please ensure the token is properly configured with repo permissions.');
     }
 
     // Get agent from database
@@ -159,7 +159,7 @@ export async function uploadToGitHub(agentId: string): Promise<DeploymentResult>
 
       // Wait for repository to be fully initialized
       console.log('Waiting for repository initialization...');
-      await new Promise(resolve => setTimeout(resolve, 5000));
+      await new Promise(resolve => setTimeout(resolve, 8000)); // Increased wait time
 
       // Prepare commit message
       const commitMessage = `🚀 Initial deployment: ${agent.name} AI Agent

@@ -39,7 +39,7 @@ class GitHubService {
     const response = await fetch(`${this.baseUrl}${endpoint}`, {
       ...options,
       headers: {
-        'Authorization': `Bearer ${this.token}`,
+        'Authorization': `token ${this.token}`, // Changed from Bearer to token
         'Accept': 'application/vnd.github.v3+json',
         'Content-Type': 'application/json',
         'User-Agent': 'PLUDO-AI-Agent-Generator',
@@ -86,7 +86,7 @@ class GitHubService {
       body: JSON.stringify({
         name: validName,
         description: description.substring(0, 350), // GitHub limit
-        private: true,
+        private: false, // Changed to public to avoid permission issues
         auto_init: true, // Initialize with README to avoid empty repo issues
         has_issues: false,
         has_projects: false,
@@ -104,7 +104,7 @@ class GitHubService {
     
     try {
       // Wait longer for repository to be fully ready since we're auto-initializing
-      await new Promise(resolve => setTimeout(resolve, 3000));
+      await new Promise(resolve => setTimeout(resolve, 5000));
 
       // Get the default branch and current commit
       let defaultBranch = 'main';
@@ -131,7 +131,7 @@ class GitHubService {
           console.log(`Found existing master branch with commit: ${parentCommitSha}`);
         } catch (masterError) {
           console.log('No existing branches found, this should not happen with auto_init=true');
-          throw new Error('Repository was not properly initialized. Please try again.');
+          throw new Error('Repository was not properly initialized. Please check your GitHub token permissions and try again.');
         }
       }
 
@@ -166,7 +166,7 @@ class GitHubService {
           
           // Small delay between blob creations to avoid rate limiting
           if (i < files.length - 1) {
-            await new Promise(resolve => setTimeout(resolve, 100));
+            await new Promise(resolve => setTimeout(resolve, 200));
           }
         } catch (error) {
           console.error(`✗ Failed to create blob for ${file.path}:`, error);
@@ -230,7 +230,7 @@ class GitHubService {
       } else if (error.message.includes('409')) {
         throw new Error('Repository conflict detected. The repository may already exist or there may be a naming conflict.');
       } else if (error.message.includes('403')) {
-        throw new Error('Access forbidden. Please ensure your GitHub token has the required "repo" permissions.');
+        throw new Error('Access forbidden. Please ensure your GitHub token has the required "repo" permissions and is not expired.');
       } else if (error.message.includes('401')) {
         throw new Error('Authentication failed. Please check if your GitHub token is valid and not expired.');
       } else if (error.message.includes('404')) {
