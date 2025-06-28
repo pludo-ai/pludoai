@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { motion, useScroll, useTransform, useSpring } from 'framer-motion';
 import { 
@@ -19,7 +19,7 @@ import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 
 export const Landing: React.FC = () => {
-  const videoRef = useRef<HTMLVideoElement>(null);
+  const videoRef = useRef<HTMLIFrameElement>(null);
   const { scrollYProgress } = useScroll();
   
   // Parallax effects
@@ -34,13 +34,6 @@ export const Landing: React.FC = () => {
   const ySpring1 = useSpring(y1, springConfig);
   const ySpring2 = useSpring(y2, springConfig);
   const ySpring3 = useSpring(y3, springConfig);
-
-  useEffect(() => {
-    // Ensure video plays on load
-    if (videoRef.current) {
-      videoRef.current.play().catch(console.error);
-    }
-  }, []);
 
   const features = [
     {
