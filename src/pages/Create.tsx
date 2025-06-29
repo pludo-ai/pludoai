@@ -31,6 +31,7 @@ import { Textarea } from '../components/ui/Textarea';
 import { Card } from '../components/ui/Card';
 import { useAuthStore } from '../store/authStore';
 import { generateAgentCode, uploadToGitHub, deployToVercel, triggerDeploymentWithFile } from '../lib/deployment';
+import { isPublicHostedUrl } from '../utils/url';
 import toast from 'react-hot-toast';
 
 interface Agent {
@@ -59,6 +60,16 @@ interface DeploymentStep {
   title: string;
   status: 'pending' | 'loading' | 'success' | 'error';
   message?: string;
+}
+
+interface DeploymentResult {
+  success: boolean;
+  agentId?: string;
+  githubRepo?: string;
+  vercelUrl?: string;
+  embedCode?: string;
+  files?: { path: string; content: string }[];
+  error?: string;
 }
 
 export const Create: React.FC = () => {
@@ -97,7 +108,7 @@ export const Create: React.FC = () => {
   ]);
 
   const [currentAgentId, setCurrentAgentId] = useState<string | null>(null);
-  const [deploymentResult, setDeploymentResult] = useState<any>(null);
+  const [deploymentResult, setDeploymentResult] = useState<DeploymentResult | null>(null);
   const [isDeploying, setIsDeploying] = useState(false);
   const [showDeployment, setShowDeployment] = useState(false);
   
@@ -453,7 +464,7 @@ export const Create: React.FC = () => {
   const isGenerateCodeDisabled = buttonStates.generateCode || isDeploying;
   const isUploadRepoDisabled = buttonStates.uploadRepo || isDeploying || deploymentSteps[0]?.status !== 'success';
   const isDeployCloudDisabled = buttonStates.deployCloud || isDeploying || deploymentSteps[1]?.status !== 'success';
-  const isMakeItLiveDisabled = buttonStates.makeItLive || !deploymentResult?.githubRepo;
+  const isMakeItLiveDisabled = buttonStates.makeItLive || !deploymentResult;
 
   if (!user) {
     return (
@@ -1014,7 +1025,7 @@ export const Create: React.FC = () => {
                     </Button>
 
                     {/* Make it Live Button */}
-                    {deploymentResult?.githubRepo && (
+                    {deploymentResult && (
                       <Button
                         onClick={handleMakeItLive}
                         disabled={isMakeItLiveDisabled}
@@ -1073,26 +1084,6 @@ export const Create: React.FC = () => {
                         </h4>
                         
                         <div className="space-y-3">
-                          {deploymentResult.githubRepo && (
-                            <div className="flex items-center justify-between p-3 bg-gray-100 dark:bg-gray-800 rounded-lg">
-                              <div className="flex items-center space-x-2">
-                                <Github className="w-4 h-4 text-gray-600 dark:text-gray-400" />
-                                <span className="text-sm text-gray-600 dark:text-gray-300">
-                                  Repository
-                                </span>
-                              </div>
-                              <div className="flex items-center space-x-2">
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => window.open(deploymentResult.githubRepo, '_blank')}
-                                >
-                                  <ExternalLink className="w-4 h-4" />
-                                </Button>
-                              </div>
-                            </div>
-                          )}
-
                           {deploymentResult.vercelUrl && (
                             <div className="flex items-center justify-between p-3 bg-gray-100 dark:bg-gray-800 rounded-lg">
                               <div className="flex items-center space-x-2">
@@ -1105,14 +1096,14 @@ export const Create: React.FC = () => {
                                 <Button
                                   variant="ghost"
                                   size="sm"
-                                  onClick={() => window.open(deploymentResult.vercelUrl, '_blank')}
+                                  onClick={() => window.open(deploymentResult.vercelUrl!, '_blank')}
                                 >
                                   <Eye className="w-4 h-4" />
                                 </Button>
                                 <Button
                                   variant="ghost"
                                   size="sm"
-                                  onClick={() => copyToClipboard(deploymentResult.vercelUrl)}
+                                  onClick={() => copyToClipboard(deploymentResult.vercelUrl!)}
                                 >
                                   <Copy className="w-4 h-4" />
                                 </Button>
@@ -1129,7 +1120,7 @@ export const Create: React.FC = () => {
                                 <Button
                                   variant="ghost"
                                   size="sm"
-                                  onClick={() => copyToClipboard(deploymentResult.embedCode)}
+                                  onClick={() => copyToClipboard(deploymentResult.embedCode!)}
                                 >
                                   <Copy className="w-4 h-4" />
                                 </Button>
