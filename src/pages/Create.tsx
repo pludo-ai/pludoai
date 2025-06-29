@@ -17,22 +17,19 @@ import {
   ExternalLink,
   Copy,
   Download,
-  Github,
   Globe,
   Zap,
   Key,
   Shield,
   Server,
-  Cloud,
-  EyeOff
+  Cloud
 } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Textarea } from '../components/ui/Textarea';
 import { Card } from '../components/ui/Card';
 import { useAuthStore } from '../store/authStore';
-import { generateAgentCode, uploadToGitHub, deployToVercel, triggerDeploymentWithFile, regenerateAgent } from '../lib/deployment';
-import { validateSubdomain, generateSubdomainFromBrand, constructPludoUrl } from '../lib/subdomain';
+import { generateAgentCode, uploadToRepository, deployToCloud, triggerDeploymentWithFile, regenerateAgent } from '../lib/deployment';
 import { supabase } from '../lib/supabase';
 import toast from 'react-hot-toast';
 
@@ -66,10 +63,10 @@ interface DeploymentStep {
 
 export const Create: React.FC = () => {
   const navigate = useNavigate();
+  const { user } = useAuthStore();
   const [searchParams] = useSearchParams();
   const editAgentId = searchParams.get('edit');
   const isEditMode = !!editAgentId;
-  const { user } = useAuthStore();
   
   // Form state
   const [formData, setFormData] = useState<Agent>({
@@ -106,8 +103,6 @@ export const Create: React.FC = () => {
   const [deploymentResult, setDeploymentResult] = useState<any>(null);
   const [isDeploying, setIsDeploying] = useState(false);
   const [showDeployment, setShowDeployment] = useState(false);
-  const [showApiKey, setShowApiKey] = useState(false);
-  const [subdomainValidation, setSubdomainValidation] = useState<{ isValid: boolean; message?: string }>({ isValid: true });
   
   // Button states
   const [buttonStates, setButtonStates] = useState({
@@ -118,13 +113,10 @@ export const Create: React.FC = () => {
     updateAgent: false,
   });
 
-  // Trigger timer state
-  const [triggerTimer, setTriggerTimer] = useState({
-    isVisible: false,
-    isEnabled: false,
-    countdown: 45,
-    intervalId: null as NodeJS.Timeout | null
-  });
+  // Trigger deployment timer
+  const [triggerTimer, setTriggerTimer] = useState(45);
+  const [showTriggerButton, setShowTriggerButton] = useState(false);
+  const [triggerEnabled, setTriggerEnabled] = useState(false);
 
   // API Provider options
   const apiProviders = [
@@ -179,48 +171,33 @@ export const Create: React.FC = () => {
           agentType: agent.agent_type,
           roleDescription: agent.role_description,
           services: agent.services || [''],
-          faqs: agent.faqs?.map((faq: any, index: number) => ({
-            ...faq,
-            id: faq.id || `faq-${index}-${Math.random().toString(36).substr(2, 8)}`
-          })) || [{ id: `faq-${Math.random().toString(36).substr(2, 8)}`, question: '', answer: '' }],
-          primaryColor: agent.primary_color || '#eab308',
-          tone: agent.tone || 'professional',
+          faqs: agent.faqs || [{ id: `faq-${Math.random().toString(36).substr(2, 8)}`, question: '', answer: '' }],
+          primaryColor: agent.primary_color,
+          tone: agent.tone,
           avatarUrl: agent.avatar_url || '',
           officeHours: agent.office_hours || '',
           knowledge: agent.knowledge || '',
-          subdomain: agent.subdomain || '',
+          subdomain: agent.subdomain,
           apiProvider: agent.api_provider || 'openrouter',
           apiKey: agent.api_key || '',
           model: agent.model || 'deepseek/deepseek-r1',
           customModel: ''
         });
         setCurrentAgentId(agentId);
-        setDeploymentResult({
-          agentId: agentId,
-          githubRepo: agent.github_repo,
-          vercelUrl: agent.vercel_url
-        });
       }
     } catch (error: any) {
-      toast.error('Failed to load agent: ' + error.message);
+      toast.error('Failed to load agent data: ' + error.message);
       navigate('/dashboard');
     }
   };
 
   // Auto-generate subdomain from brand name (only for new agents)
   useEffect(() => {
-    if (!isEditMode && formData.brandName && !formData.subdomain) {
-      const newSubdomain = generateSubdomainFromBrand(formData.brandName);
+    if (!isEditMode && formData.brandName) {
+      const newSubdomain = generateSubdomain(formData.brandName);
       setFormData(prev => ({ ...prev, subdomain: newSubdomain }));
     }
   }, [formData.brandName, isEditMode]);
-
-  // Validate subdomain when it changes
-  useEffect(() => {
-    if (formData.subdomain) {
-      validateSubdomainInput(formData.subdomain);
-    }
-  }, [formData.subdomain]);
 
   // Update available models when API provider changes
   useEffect(() => {
@@ -230,34 +207,26 @@ export const Create: React.FC = () => {
     }
   }, [formData.apiProvider]);
 
-  // Cleanup timer on unmount
+  // Trigger deployment timer effect
   useEffect(() => {
+    let interval: NodeJS.Timeout;
+    
+    if (showTriggerButton && !triggerEnabled && triggerTimer > 0) {
+      interval = setInterval(() => {
+        setTriggerTimer(prev => {
+          if (prev <= 1) {
+            setTriggerEnabled(true);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    }
+
     return () => {
-      if (triggerTimer.intervalId) {
-        clearInterval(triggerTimer.intervalId);
-      }
+      if (interval) clearInterval(interval);
     };
-  }, [triggerTimer.intervalId]);
-
-  const validateSubdomainInput = async (subdomain: string) => {
-    if (!subdomain) {
-      setSubdomainValidation({ isValid: true });
-      return;
-    }
-
-    try {
-      const validation = await validateSubdomain(subdomain);
-      setSubdomainValidation({
-        isValid: validation.isValid && validation.isAvailable,
-        message: validation.error || (validation.isValid && validation.isAvailable ? 'Subdomain is available!' : undefined)
-      });
-    } catch (error) {
-      setSubdomainValidation({
-        isValid: false,
-        message: 'Error validating subdomain'
-      });
-    }
-  };
+  }, [showTriggerButton, triggerEnabled, triggerTimer]);
 
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -330,45 +299,6 @@ export const Create: React.FC = () => {
     setButtonStates(prev => ({ ...prev, [button]: loading }));
   };
 
-  const startTriggerTimer = () => {
-    // Make visible and start countdown
-    setTriggerTimer(prev => ({
-      ...prev,
-      isVisible: true,
-      isEnabled: false,
-      countdown: 45
-    }));
-
-    // Clear any existing interval
-    if (triggerTimer.intervalId) {
-      clearInterval(triggerTimer.intervalId);
-    }
-
-    // Start 1-second interval
-    const intervalId = setInterval(() => {
-      setTriggerTimer(prev => {
-        const newCountdown = prev.countdown - 1;
-        
-        if (newCountdown <= 0) {
-          clearInterval(intervalId);
-          return {
-            ...prev,
-            isEnabled: true,
-            countdown: 0,
-            intervalId: null
-          };
-        }
-        
-        return {
-          ...prev,
-          countdown: newCountdown
-        };
-      });
-    }, 1000);
-
-    setTriggerTimer(prev => ({ ...prev, intervalId }));
-  };
-
   const validateForm = () => {
     if (!formData.name.trim()) {
       toast.error('Agent name is required');
@@ -394,11 +324,63 @@ export const Create: React.FC = () => {
       toast.error('Custom model name is required');
       return false;
     }
-    if (!isEditMode && (!formData.subdomain.trim() || !subdomainValidation.isValid)) {
-      toast.error('Valid subdomain is required');
-      return false;
-    }
     return true;
+  };
+
+  const handleUpdateAgent = async () => {
+    if (!validateForm()) return;
+    if (!user || !currentAgentId) {
+      toast.error('Please sign in to continue');
+      return;
+    }
+
+    setIsDeploying(true);
+    setButtonLoading('updateAgent', true);
+
+    try {
+      // Use custom model if selected
+      const finalModel = formData.model === 'custom' ? formData.customModel : formData.model;
+
+      // Update agent in database
+      const { error: updateError } = await supabase
+        .from('agents')
+        .update({
+          name: formData.name,
+          brand_name: formData.brandName,
+          website_name: formData.websiteName,
+          agent_type: formData.agentType,
+          role_description: formData.roleDescription,
+          services: formData.services.filter(s => s.trim()),
+          faqs: formData.faqs.filter(faq => faq.question.trim() && faq.answer.trim()),
+          primary_color: formData.primaryColor,
+          tone: formData.tone,
+          avatar_url: formData.avatarUrl,
+          office_hours: formData.officeHours,
+          knowledge: formData.knowledge,
+          api_provider: formData.apiProvider,
+          api_key: formData.apiKey,
+          model: finalModel,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', currentAgentId);
+
+      if (updateError) throw updateError;
+
+      // Regenerate and update repository
+      const result = await regenerateAgent(currentAgentId);
+
+      if (result.success) {
+        toast.success('Agent updated successfully!');
+        navigate('/dashboard');
+      } else {
+        toast.error(result.error || 'Failed to update agent');
+      }
+    } catch (error: any) {
+      toast.error('Failed to update agent: ' + error.message);
+    } finally {
+      setIsDeploying(false);
+      setButtonLoading('updateAgent', false);
+    }
   };
 
   const handleGenerateCode = async () => {
@@ -416,11 +398,15 @@ export const Create: React.FC = () => {
     try {
       updateDeploymentStep('step-1', 'loading', 'Generating agent code...');
 
+      // Ensure subdomain is generated if not already
+      const finalSubdomain = formData.subdomain || generateSubdomain(formData.brandName);
+
       // Use custom model if selected
       const finalModel = formData.model === 'custom' ? formData.customModel : formData.model;
 
       const config = {
         ...formData,
+        subdomain: finalSubdomain,
         model: finalModel,
         services: formData.services.filter(s => s.trim()),
         faqs: formData.faqs.filter(faq => faq.question.trim() && faq.answer.trim()),
@@ -459,7 +445,7 @@ export const Create: React.FC = () => {
     try {
       updateDeploymentStep('step-2', 'loading', 'Creating repository...');
 
-      const result = await uploadToGitHub(currentAgentId);
+      const result = await uploadToRepository(currentAgentId);
 
       if (result.success) {
         updateDeploymentStep('step-2', 'success', 'Uploaded to repository successfully');
@@ -487,18 +473,23 @@ export const Create: React.FC = () => {
     setIsDeploying(true);
     setButtonLoading('deployCloud', true);
 
-    // Start the trigger timer immediately when deploy to cloud is clicked
-    startTriggerTimer();
+    // Show trigger button immediately and start timer
+    setShowTriggerButton(true);
+    setTriggerEnabled(false);
+    setTriggerTimer(45);
 
     try {
       updateDeploymentStep('step-3', 'loading', 'Deploying to cloud...');
 
-      const result = await deployToVercel(currentAgentId);
+      const result = await deployToCloud(currentAgentId);
 
       if (result.success) {
         updateDeploymentStep('step-3', 'success', 'Deployed to cloud successfully');
         setDeploymentResult(prev => ({ ...prev, ...result }));
         toast.success('Agent deployed successfully!');
+        
+        // Hide trigger button if deployment was successful
+        setShowTriggerButton(false);
       } else {
         updateDeploymentStep('step-3', 'error', result.error);
         toast.error('Failed to deploy to cloud');
@@ -532,6 +523,9 @@ export const Create: React.FC = () => {
         if (result.vercelUrl) {
           setDeploymentResult(prev => ({ ...prev, ...result }));
         }
+        
+        // Hide trigger button after successful trigger
+        setShowTriggerButton(false);
       } else {
         toast.error(result.error || 'Failed to trigger deployment', { id: 'make-live' });
       }
@@ -542,64 +536,18 @@ export const Create: React.FC = () => {
     }
   };
 
-  const handleUpdateAgent = async () => {
-    if (!validateForm()) return;
-    if (!currentAgentId) {
-      toast.error('No agent to update');
-      return;
-    }
-
-    setButtonLoading('updateAgent', true);
-
-    try {
-      toast.loading('Updating agent...', { id: 'update-agent' });
-
-      // Update agent in database
-      const finalModel = formData.model === 'custom' ? formData.customModel : formData.model;
-      
-      const { error: updateError } = await supabase
-        .from('agents')
-        .update({
-          name: formData.name,
-          brand_name: formData.brandName,
-          website_name: formData.websiteName,
-          agent_type: formData.agentType,
-          role_description: formData.roleDescription,
-          services: formData.services.filter(s => s.trim()),
-          faqs: formData.faqs.filter(faq => faq.question.trim() && faq.answer.trim()),
-          primary_color: formData.primaryColor,
-          tone: formData.tone,
-          avatar_url: formData.avatarUrl,
-          office_hours: formData.officeHours,
-          knowledge: formData.knowledge,
-          api_provider: formData.apiProvider,
-          api_key: formData.apiKey,
-          model: finalModel,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', currentAgentId);
-
-      if (updateError) throw updateError;
-
-      // Regenerate and push to repository
-      const result = await regenerateAgent(currentAgentId);
-
-      if (result.success) {
-        toast.success('Agent updated successfully!', { id: 'update-agent' });
-        setDeploymentResult(prev => ({ ...prev, ...result }));
-      } else {
-        toast.error(result.error || 'Failed to update agent', { id: 'update-agent' });
-      }
-    } catch (error: any) {
-      toast.error('Failed to update agent: ' + error.message, { id: 'update-agent' });
-    } finally {
-      setButtonLoading('updateAgent', false);
-    }
-  };
-
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
     toast.success('Copied to clipboard!');
+  };
+
+  // Helper function to generate a unique subdomain
+  const generateSubdomain = (brandName: string): string => {
+    const cleanBrandName = brandName.toLowerCase().replace(/[^a-z0-9]/g, '-').substring(0, 20);
+    const userSuffix = user?.id.slice(-4) || Math.random().toString(36).substr(2, 4);
+    const randomSuffix = Math.random().toString(36).substr(2, 4);
+    const timestamp = Date.now().toString().slice(-6);
+    return `${cleanBrandName}-ai-agent-${userSuffix}-${randomSuffix}-${timestamp}`;
   };
 
   const getStepIcon = (status: DeploymentStep['status']) => {
@@ -628,15 +576,14 @@ export const Create: React.FC = () => {
   const isGenerateCodeDisabled = buttonStates.generateCode || isDeploying;
   const isUploadRepoDisabled = buttonStates.uploadRepo || isDeploying || deploymentSteps[0]?.status !== 'success';
   const isDeployCloudDisabled = buttonStates.deployCloud || isDeploying || deploymentSteps[1]?.status !== 'success';
-  const isMakeItLiveDisabled = buttonStates.makeItLive || !triggerTimer.isEnabled;
-  const isUpdateAgentDisabled = buttonStates.updateAgent;
+  const isMakeItLiveDisabled = buttonStates.makeItLive || !showTriggerButton || !triggerEnabled;
 
   if (!user) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-white dark:bg-[#0A0A0A] pt-16 transition-colors duration-300">
         <div className="bg-gradient-to-br from-gray-50 via-white to-gray-100 dark:from-[#1A1A1A] dark:via-[#0A0A0A] dark:to-black border border-gray-300/50 dark:border-yellow-500/30 rounded-2xl shadow-2xl shadow-gray-400/20 dark:shadow-yellow-500/20 p-8 text-center transition-all duration-300">
           <img 
-            src="/pludo_svg_logo.svg" 
+            src="https://pludo.online/pludo_svg_logo.svg" 
             alt="PLUDO.AI Logo" 
             className="w-12 h-12 mx-auto mb-4 opacity-70"
           />
@@ -672,7 +619,7 @@ export const Create: React.FC = () => {
             </h1>
             <p className="text-xl text-gray-600 dark:text-gray-400 max-w-3xl mx-auto">
               {isEditMode 
-                ? 'Update your intelligent AI assistant configuration and deploy changes.'
+                ? 'Update your intelligent AI assistant configuration and settings.'
                 : 'Design, customize, and deploy your intelligent AI assistant in minutes. No coding required.'
               }
             </p>
@@ -692,7 +639,7 @@ export const Create: React.FC = () => {
                 <div className="flex items-center space-x-3 mb-6">
                   <div className="p-2 bg-yellow-100 dark:bg-yellow-500/20 rounded-lg">
                     <img 
-                      src="/pludo_svg_logo.svg" 
+                      src="https://pludo.online/pludo_svg_logo.svg" 
                       alt="PLUDO.AI Logo" 
                       className="w-6 h-6"
                     />
@@ -754,46 +701,33 @@ export const Create: React.FC = () => {
                   />
                 </div>
 
-                {/* Subdomain Input */}
-                <div className="mt-6">
-                  <div className="relative">
-                    <Input
-                      label="Subdomain"
-                      value={formData.subdomain}
-                      onChange={(e) => handleInputChange('subdomain', e.target.value)}
-                      placeholder="your-brand-name"
-                      required={!isEditMode}
-                      disabled={isEditMode}
-                      error={!subdomainValidation.isValid ? subdomainValidation.message : undefined}
-                    />
-                    <div className="mt-2 flex items-center space-x-2">
-                      <span className="text-sm text-gray-500 dark:text-gray-400">
-                        Your agent will be available at:
-                      </span>
-                      <code className="text-sm bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded">
-                        {formData.subdomain || 'your-subdomain'}.pludo.online
+                {/* Auto-generated Subdomain Display */}
+                {formData.subdomain && (
+                  <div className="mt-6">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Generated Subdomain
+                    </label>
+                    <div className="flex items-center space-x-2 p-3 bg-gray-100 dark:bg-gray-800 rounded-lg">
+                      <code className="text-sm text-gray-600 dark:text-gray-300 flex-1">
+                        {formData.subdomain}
                       </code>
-                      {formData.subdomain && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => copyToClipboard(constructPludoUrl(formData.subdomain))}
-                        >
-                          <Copy className="w-4 h-4" />
-                        </Button>
-                      )}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => copyToClipboard(formData.subdomain)}
+                      >
+                        <Copy className="w-4 h-4" />
+                      </Button>
                     </div>
-                    {subdomainValidation.isValid && subdomainValidation.message && (
-                      <p className="text-sm text-green-600 dark:text-green-400 mt-1">
-                        {subdomainValidation.message}
-                      </p>
-                    )}
+                    <p className="text-xs text-gray-500 mt-1">
+                      This unique identifier is automatically generated for your agent
+                    </p>
                   </div>
-                </div>
+                )}
               </div>
             </motion.div>
 
-            {/* API Configuration */}
+            {/* AI Configuration */}
             <motion.div
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
@@ -810,7 +744,7 @@ export const Create: React.FC = () => {
                 </div>
 
                 <div className="space-y-6">
-                  {/* API Provider Selection */}
+                  {/* AI Provider Selection */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
                       AI Provider
@@ -878,31 +812,22 @@ export const Create: React.FC = () => {
                         required
                       />
                       <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                        Enter the exact model name as it appears in the OpenRouter documentation
+                        Enter the exact model name as it appears in the provider documentation
                       </p>
                     </div>
                   )}
 
                   {/* API Key Input */}
                   <div>
-                    <div className="relative">
-                      <Input
-                        label={`${getCurrentProvider()?.name} API Key`}
-                        type={showApiKey ? 'text' : 'password'}
-                        value={formData.apiKey}
-                        onChange={(e) => handleInputChange('apiKey', e.target.value)}
-                        placeholder={`Enter your ${getCurrentProvider()?.name} API key`}
-                        icon={<Shield className="w-5 h-5 text-gray-400" />}
-                        required
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowApiKey(!showApiKey)}
-                        className="absolute right-3 top-8 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-                      >
-                        {showApiKey ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                      </button>
-                    </div>
+                    <Input
+                      label={`${getCurrentProvider()?.name} API Key`}
+                      type="password"
+                      value={formData.apiKey}
+                      onChange={(e) => handleInputChange('apiKey', e.target.value)}
+                      placeholder={`Enter your ${getCurrentProvider()?.name} API key`}
+                      icon={<Shield className="w-5 h-5 text-gray-400" />}
+                      required
+                    />
                     <div className="mt-2 p-3 bg-blue-50 dark:bg-blue-500/10 rounded-lg">
                       <div className="flex items-start">
                         <Shield className="w-4 h-4 text-blue-600 dark:text-blue-400 mt-0.5 mr-2 flex-shrink-0" />
@@ -910,12 +835,12 @@ export const Create: React.FC = () => {
                           <strong>Secure:</strong> Your API key is encrypted and stored securely. It's only used to power your AI agent's conversations.
                           {formData.apiProvider === 'openrouter' && (
                             <div className="mt-1">
-                              Get your API key from <a href="https://openrouter.ai/keys" target="_blank" rel="noopener noreferrer" className="underline">OpenRouter Dashboard</a>
+                              Get your API key from the provider dashboard
                             </div>
                           )}
                           {formData.apiProvider === 'gemini' && (
                             <div className="mt-1">
-                              Get your API key from <a href="https://makersuite.google.com/app/apikey" target="_blank" rel="noopener noreferrer" className="underline">Google AI Studio</a>
+                              Get your API key from Google AI Studio
                             </div>
                           )}
                         </div>
@@ -1152,7 +1077,7 @@ export const Create: React.FC = () => {
                           style={{ backgroundColor: formData.primaryColor }}
                         >
                           <img 
-                            src="/pludo_svg_logo.svg" 
+                            src="https://pludo.online/pludo_svg_logo.svg" 
                             alt="PLUDO.AI Logo" 
                             className="w-6 h-6"
                           />
@@ -1177,12 +1102,6 @@ export const Create: React.FC = () => {
                     <div className="text-xs text-gray-500 space-y-1">
                       <div>Tone: {formData.tone} • Type: {formData.agentType.replace('-', ' ')}</div>
                       <div>AI: {getCurrentProvider()?.name} • Model: {getCurrentModels().find(m => m.id === formData.model)?.name || (formData.model === 'custom' ? formData.customModel : formData.model)}</div>
-                      {formData.subdomain && (
-                        <div className="flex items-center space-x-1">
-                          <Globe className="w-3 h-3" />
-                          <span>{formData.subdomain}.pludo.online</span>
-                        </div>
-                      )}
                     </div>
                   </div>
 
@@ -1190,11 +1109,11 @@ export const Create: React.FC = () => {
                     {isEditMode ? (
                       <Button
                         onClick={handleUpdateAgent}
-                        disabled={isUpdateAgentDisabled}
+                        disabled={buttonStates.updateAgent}
                         className="w-full bg-gradient-to-r from-gray-800 to-gray-700 dark:from-yellow-500 dark:to-yellow-400 hover:from-gray-700 hover:to-gray-600 dark:hover:from-yellow-400 dark:hover:to-yellow-300 text-white dark:text-black font-bold"
                         loading={buttonStates.updateAgent}
                       >
-                        <Code className="w-4 h-4 mr-2" />
+                        <Upload className="w-4 h-4 mr-2" />
                         Update Agent
                       </Button>
                     ) : (
@@ -1216,7 +1135,7 @@ export const Create: React.FC = () => {
                           className="w-full"
                           loading={buttonStates.uploadRepo}
                         >
-                          <Github className="w-4 h-4 mr-2" />
+                          <Upload className="w-4 h-4 mr-2" />
                           Upload to Repository
                         </Button>
 
@@ -1231,23 +1150,20 @@ export const Create: React.FC = () => {
                           Deploy to Cloud
                         </Button>
 
-                        {/* Trigger Deployment Button - Shows immediately after Deploy to Cloud is clicked */}
-                        {triggerTimer.isVisible && (
+                        {/* Trigger Deployment Button */}
+                        {showTriggerButton && (
                           <Button
                             onClick={handleMakeItLive}
                             disabled={isMakeItLiveDisabled}
-                            className={`w-full transition-all duration-300 ${
-                              triggerTimer.isEnabled
+                            className={`w-full font-bold ${
+                              triggerEnabled
                                 ? 'bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white'
                                 : 'bg-gray-400 dark:bg-gray-600 text-gray-600 dark:text-gray-400 cursor-not-allowed'
                             }`}
                             loading={buttonStates.makeItLive}
                           >
                             <Zap className="w-4 h-4 mr-2" />
-                            {triggerTimer.isEnabled 
-                              ? 'Trigger Deployment' 
-                              : `Trigger Deployment (${triggerTimer.countdown}s)`
-                            }
+                            {triggerEnabled ? 'Trigger Deployment' : `Wait ${triggerTimer}s`}
                           </Button>
                         )}
                       </>
@@ -1303,7 +1219,7 @@ export const Create: React.FC = () => {
                           {deploymentResult.githubRepo && (
                             <div className="flex items-center justify-between p-3 bg-gray-100 dark:bg-gray-800 rounded-lg">
                               <div className="flex items-center space-x-2">
-                                <Github className="w-4 h-4 text-gray-600 dark:text-gray-400" />
+                                <Server className="w-4 h-4 text-gray-600 dark:text-gray-400" />
                                 <span className="text-sm text-gray-600 dark:text-gray-300">
                                   Repository
                                 </span>

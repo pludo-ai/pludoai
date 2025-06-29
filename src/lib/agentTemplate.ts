@@ -12,7 +12,6 @@ interface AgentConfig {
   subdomain: string;
   officeHours?: string;
   knowledge: string;
-  vercelUrl?: string;
   // New API configuration fields
   apiProvider: string;
   apiKey: string;
@@ -20,6 +19,10 @@ interface AgentConfig {
 }
 
 export function generateAgentFiles(config: AgentConfig, vercelUrl?: string): { path: string; content: string }[] {
+  // Use default avatar if none provided
+  const defaultAvatarUrl = 'https://pludo.online/pludo_svg_logo.svg';
+  const finalAvatarUrl = config.avatarUrl && config.avatarUrl.trim() ? config.avatarUrl : defaultAvatarUrl;
+
   const files = [
     {
       path: 'package.json',
@@ -118,7 +121,7 @@ export default {
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <link rel="icon" type="image/svg+xml" href="https://pludo.online/pludo_svg_logo.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>${config.name} - AI Assistant for ${config.brandName}</title>
     <meta name="description" content="Meet ${config.name}, your intelligent AI assistant for ${config.brandName}. ${config.roleDescription}">
@@ -147,6 +150,7 @@ export default {
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="https://pludo.online/pludo_svg_logo.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>${config.name} - Chat Widget</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -246,7 +250,7 @@ body {
     },
     {
       path: 'src/App.tsx',
-      content: generateAppComponent(config)
+      content: generateAppComponent(config, finalAvatarUrl)
     },
     {
       path: 'src/FloatingWidget.tsx',
@@ -254,11 +258,11 @@ body {
     },
     {
       path: 'src/components/ChatWidget.tsx',
-      content: generateChatWidget(config)
+      content: generateChatWidget(config, finalAvatarUrl)
     },
     {
       path: 'src/components/FloatingButton.tsx',
-      content: generateFloatingButton(config)
+      content: generateFloatingButton(config, finalAvatarUrl)
     },
     {
       path: 'src/lib/ai.ts',
@@ -298,81 +302,6 @@ ${config.knowledge || 'No additional information provided.'}`
       content: generateReadme(config)
     },
     {
-      path: 'vercel.json',
-      content: JSON.stringify({
-        "buildCommand": "npm run build",
-        "outputDirectory": "dist",
-        "installCommand": "npm install",
-        "framework": "vite",
-        "headers": [
-          {
-            "source": "/widget.js",
-            "headers": [
-              {
-                "key": "Cross-Origin-Resource-Policy",
-                "value": "cross-origin"
-              },
-              {
-                "key": "Access-Control-Allow-Origin",
-                "value": "*"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/javascript"
-              }
-            ]
-          },
-          {
-            "source": "/widget.html",
-            "headers": [
-              {
-                "key": "Cross-Origin-Embedder-Policy",
-                "value": "unsafe-none"
-              },
-              {
-                "key": "Cross-Origin-Resource-Policy",
-                "value": "cross-origin"
-              }
-            ]
-          }
-        ],
-        "rewrites": [
-          {
-            "source": "/widget.js",
-            "destination": "/widget.js"
-          },
-          {
-            "source": "/widget",
-            "destination": "/widget.html"
-          },
-          {
-            "source": "/widget.html",
-            "destination": "/widget.html"
-          },
-          {
-            "source": "/(.*)",
-            "destination": "/index.html"
-          }
-        ]
-      }, null, 2)
-    },
-    {
-      path: '_headers',
-      content: `# Headers for Netlify deployment
-/widget.js
-  Cross-Origin-Resource-Policy: cross-origin
-  Access-Control-Allow-Origin: *
-  Content-Type: application/javascript
-
-/widget.html
-  Cross-Origin-Embedder-Policy: unsafe-none
-  Cross-Origin-Resource-Policy: cross-origin
-
-/*
-  X-Frame-Options: SAMEORIGIN
-  X-Content-Type-Options: nosniff`
-    },
-    {
       path: '.env',
       content: `# AI Configuration
 VITE_API_PROVIDER=${config.apiProvider}
@@ -387,20 +316,10 @@ VITE_TONE=${config.tone}`
     }
   ];
 
-  // Add avatar image file if provided
-  if (config.avatarUrl) {
-    files.push({
-      path: 'public/avatar.jpg',
-      content: `# Avatar image will be downloaded from: ${config.avatarUrl}
-# This file serves as a placeholder for the avatar image.
-# The actual image will be included in the repository during deployment.`
-    });
-  }
-
   return files;
 }
 
-function generateAppComponent(config: AgentConfig): string {
+function generateAppComponent(config: AgentConfig, avatarUrl: string): string {
   return `import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { ChatWidget } from './components/ChatWidget';
@@ -416,7 +335,7 @@ function App() {
       <header className="bg-white/80 backdrop-blur-md border-b border-gray-200 sticky top-0 z-40">
         <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center space-x-3">
-            ${config.avatarUrl ? `<img src="${config.avatarUrl}" alt="${config.name}" className="w-10 h-10 rounded-full" />` : `<div className="w-10 h-10 bg-gradient-to-r from-primary-500 to-primary-600 rounded-full flex items-center justify-center"><Bot className="w-6 h-6 text-white" /></div>`}
+            <img src="${avatarUrl}" alt="${config.name}" className="w-10 h-10 rounded-full" />
             <div>
               <h1 className="text-xl font-bold text-gray-900">${config.name}</h1>
               <p className="text-sm text-gray-600">${config.brandName}</p>
@@ -441,7 +360,7 @@ function App() {
             transition={{ duration: 0.8 }}
           >
             <div className="mb-8">
-              ${config.avatarUrl ? `<img src="${config.avatarUrl}" alt="${config.name}" className="w-32 h-32 rounded-full mx-auto mb-6 shadow-2xl" />` : `<div className="w-32 h-32 bg-gradient-to-r from-primary-500 to-primary-600 rounded-full flex items-center justify-center mx-auto mb-6 shadow-2xl"><Bot className="w-16 h-16 text-white" /></div>`}
+              <img src="${avatarUrl}" alt="${config.name}" className="w-32 h-32 rounded-full mx-auto mb-6 shadow-2xl" />
               <h1 className="text-5xl font-bold text-gray-900 mb-4">
                 Hi! I'm ${config.name}
               </h1>
@@ -491,6 +410,7 @@ function App() {
               className="bg-white p-8 rounded-2xl shadow-lg"
             >
               <h3 className="text-2xl font-bold text-gray-900 mb-6 flex items-center">
+                
                 <MessageCircle className="w-6 h-6 text-primary-600 mr-2" />
                 Quick Questions
               </h3>
@@ -511,7 +431,7 @@ function App() {
       <footer className="bg-gray-900 text-white py-12 px-4">
         <div className="max-w-4xl mx-auto text-center">
           <div className="flex items-center justify-center space-x-3 mb-4">
-            ${config.avatarUrl ? `<img src="${config.avatarUrl}" alt="${config.name}" className="w-8 h-8 rounded-full" />` : `<div className="w-8 h-8 bg-gradient-to-r from-primary-500 to-primary-600 rounded-full flex items-center justify-center"><Bot className="w-4 h-4 text-white" /></div>`}
+            <img src="${avatarUrl}" alt="${config.name}" className="w-8 h-8 rounded-full" />
             <span className="text-lg font-semibold">${config.name}</span>
           </div>
           <p className="text-gray-400 mb-4">
@@ -569,7 +489,7 @@ function FloatingWidget() {
 export default FloatingWidget;`;
 }
 
-function generateChatWidget(config: AgentConfig): string {
+function generateChatWidget(config: AgentConfig, avatarUrl: string): string {
   return `import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Send, Bot, User, Minimize2 } from 'lucide-react';
@@ -709,7 +629,7 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({ isOpen, onClose, config 
             background: 'linear-gradient(to right, #f8fafc, #f1f5f9)'
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              ${config.avatarUrl ? `<img src="${config.avatarUrl}" alt="${config.name}" style={{ width: '40px', height: '40px', borderRadius: '50%' }} />` : `<div style={{ width: '40px', height: '40px', background: 'linear-gradient(to right, #3b82f6, #1d4ed8)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Bot style={{ width: '24px', height: '24px', color: 'white' }} /></div>`}
+              <img src="${avatarUrl}" alt="${config.name}" style={{ width: '40px', height: '40px', borderRadius: '50%' }} />
               <div>
                 <h3 style={{ fontWeight: '600', color: '#111827', margin: 0, fontSize: '14px' }}>\${config.name}</h3>
                 <p style={{ fontSize: '12px', color: '#6b7280', margin: 0 }}>AI Assistant</p>
@@ -902,7 +822,7 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({ isOpen, onClose, config 
 };`;
 }
 
-function generateFloatingButton(config: AgentConfig): string {
+function generateFloatingButton(config: AgentConfig, avatarUrl: string): string {
   return `import React from 'react';
 import { motion } from 'framer-motion';
 import { MessageCircle, Bot } from 'lucide-react';
@@ -953,7 +873,7 @@ export const FloatingButton: React.FC<FloatingButtonProps> = ({ onClick }) => {
           delay: 2
         }}
       >
-        ${config.avatarUrl ? `<img src="${config.avatarUrl}" alt="${config.name}" style={{ width: '32px', height: '32px', borderRadius: '50%' }} />` : `<Bot style={{ width: '24px', height: '24px' }} />`}
+        <img src="${avatarUrl}" alt="${config.name}" style={{ width: '32px', height: '32px', borderRadius: '50%' }} />
       </motion.div>
       
       {/* Pulse animation */}
@@ -1137,7 +1057,7 @@ export default agentConfig;`;
 
 function generateWidgetScript(config: AgentConfig, vercelUrl?: string): string {
   // Use the provided vercelUrl or fall back to a placeholder that will be replaced during deployment
-  const baseUrl = vercelUrl || '{{VERCEL_URL}}';
+  const baseUrl = vercelUrl || '{{DEPLOYMENT_URL}}';
   
   return `(function() {
   'use strict';
@@ -1151,9 +1071,9 @@ function generateWidgetScript(config: AgentConfig, vercelUrl?: string): string {
   
   // Get the base URL for the widget
   const getWidgetBaseUrl = () => {
-    // If we have a hardcoded vercel URL, use it
+    // If we have a hardcoded deployment URL, use it
     const hardcodedUrl = '${baseUrl}';
-    if (hardcodedUrl && hardcodedUrl !== '{{VERCEL_URL}}') {
+    if (hardcodedUrl && hardcodedUrl !== '{{DEPLOYMENT_URL}}') {
       return hardcodedUrl;
     }
     
@@ -1257,7 +1177,7 @@ This AI assistant is ready to deploy and can be embedded on any website.
 Add this script tag to your website:
 
 \`\`\`html
-<script src="https://your-domain.vercel.app/widget.js" defer></script>
+<script src="https://your-domain.pludo.online/widget.js" defer></script>
 \`\`\`
 
 ### Local Development

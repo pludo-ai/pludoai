@@ -15,9 +15,12 @@ import {
   Globe,
   AlertCircle,
   Trash2,
+  Upload,
+  Save
 } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
+import { Textarea } from '../components/ui/Textarea';
 import { useAuthStore } from '../store/authStore';
 import { supabase } from '../lib/supabase';
 import { isPludoOnlineDomain } from '../utils/url';
@@ -32,6 +35,7 @@ interface Agent {
   subdomain: string;
   github_repo?: string;
   vercel_url?: string;
+  knowledge: string;
   created_at: string;
   updated_at: string;
 }
@@ -43,6 +47,9 @@ export const Dashboard: React.FC = () => {
   const [agents, setAgents] = useState<Agent[]>([]);
   const [loading, setLoading] = useState(true);
   const [deletingAgents, setDeletingAgents] = useState<Set<string>>(new Set());
+  const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null);
+  const [knowledgeContent, setKnowledgeContent] = useState('');
+  const [isUpdatingKnowledge, setIsUpdatingKnowledge] = useState(false);
 
   const tabs = [
     { id: 'overview', label: 'Overview', icon: <Bot className="w-4 h-4" /> },
@@ -54,6 +61,13 @@ export const Dashboard: React.FC = () => {
   useEffect(() => {
     fetchAgents();
   }, [user]);
+
+  useEffect(() => {
+    if (activeTab === 'memory' && agents.length > 0 && !selectedAgent) {
+      setSelectedAgent(agents[0]);
+      setKnowledgeContent(agents[0].knowledge || '');
+    }
+  }, [activeTab, agents, selectedAgent]);
 
   const fetchAgents = async () => {
     if (!user) return;
@@ -83,41 +97,13 @@ export const Dashboard: React.FC = () => {
   };
 
   const handleDeleteAgent = async (agent: Agent) => {
-    if (!confirm(`Are you sure you want to delete "${agent.name}"? This will permanently delete the agent, its repository, and cannot be undone.`)) {
+    if (!confirm(`Are you sure you want to delete "${agent.name}"? This will permanently delete the agent and cannot be undone.`)) {
       return;
     }
 
     setDeletingAgents(prev => new Set(prev).add(agent.id));
 
     try {
-      // Delete from repository if repository exists
-      if (agent.github_repo) {
-        try {
-          const repoFullName = agent.github_repo.replace('https://github.com/', '').replace('.git', '');
-          
-          // Delete the repository
-          const response = await fetch(`https://api.github.com/repos/${repoFullName}`, {
-            method: 'DELETE',
-            headers: {
-              'Authorization': `token ${process.env.GITHUB_TOKEN}`,
-              'Accept': 'application/vnd.github.v3+json',
-            },
-          });
-
-          if (response.ok) {
-            console.log(`Repository ${repoFullName} deleted successfully`);
-          } else {
-            console.error('Failed to delete repository:', response.status, response.statusText);
-            // Continue with database deletion even if repository deletion fails
-            toast.error('Warning: Failed to delete repository, but continuing with agent deletion');
-          }
-        } catch (githubError) {
-          console.error('Failed to delete repository:', githubError);
-          // Continue with database deletion even if repository deletion fails
-          toast.error('Warning: Failed to delete repository, but continuing with agent deletion');
-        }
-      }
-
       // Delete from database
       const { error } = await supabase
         .from('agents')
@@ -142,6 +128,41 @@ export const Dashboard: React.FC = () => {
     }
   };
 
+  const handleUpdateKnowledge = async () => {
+    if (!selectedAgent) {
+      toast.error('No agent selected');
+      return;
+    }
+
+    setIsUpdatingKnowledge(true);
+
+    try {
+      // Update database
+      const { error: dbError } = await supabase
+        .from('agents')
+        .update({ knowledge: knowledgeContent })
+        .eq('id', selectedAgent.id);
+
+      if (dbError) throw dbError;
+
+      // Update local state
+      setAgents(prev => prev.map(agent => 
+        agent.id === selectedAgent.id 
+          ? { ...agent, knowledge: knowledgeContent }
+          : agent
+      ));
+
+      setSelectedAgent(prev => prev ? { ...prev, knowledge: knowledgeContent } : null);
+
+      toast.success('Knowledge base updated successfully!');
+    } catch (error: any) {
+      console.error('Update knowledge error:', error);
+      toast.error('Failed to update knowledge base: ' + error.message);
+    } finally {
+      setIsUpdatingKnowledge(false);
+    }
+  };
+
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
     toast.success('Copied to clipboard!');
@@ -161,7 +182,7 @@ export const Dashboard: React.FC = () => {
   };
 
   const getAgentStatus = (agent: Agent) => {
-    // Check if agent has a pludo.online URL or a working Vercel URL
+    // Check if agent has a pludo.online URL or a working deployment URL
     if (agent.vercel_url && (isPludoOnlineDomain(agent.vercel_url) || agent.vercel_url.includes('.vercel.app'))) {
       return { status: 'live', color: 'bg-green-100 dark:bg-green-500/20 text-green-800 dark:text-green-400 border-green-200 dark:border-green-500/30' };
     } else if (agent.github_repo) {
@@ -172,7 +193,7 @@ export const Dashboard: React.FC = () => {
   };
 
   const getAgentUrl = (agent: Agent) => {
-    // Prefer pludo.online URL, fallback to vercel URL
+    // Prefer pludo.online URL, fallback to deployment URL
     if (agent.vercel_url && isPludoOnlineDomain(agent.vercel_url)) {
       return agent.vercel_url;
     } else if (agent.subdomain) {
@@ -202,7 +223,7 @@ export const Dashboard: React.FC = () => {
                 <div className="hidden md:block">
                   <div className="w-16 h-16 bg-gradient-to-r from-gray-800 to-gray-700 dark:from-yellow-500 dark:to-yellow-400 rounded-full flex items-center justify-center">
                     <img 
-                      src="/pludo_svg_logo.svg" 
+                      src="https://pludo.online/pludo_svg_logo.svg" 
                       alt="PLUDO.AI Logo" 
                       className="w-8 h-8"
                     />
@@ -270,7 +291,7 @@ export const Dashboard: React.FC = () => {
               ) : agents.length === 0 ? (
                 <div className="text-center py-8">
                   <img 
-                    src="/pludo_svg_logo.svg" 
+                    src="https://pludo.online/pludo_svg_logo.svg" 
                     alt="PLUDO.AI Logo" 
                     className="w-12 h-12 mx-auto mb-4 opacity-50"
                   />
@@ -294,7 +315,7 @@ export const Dashboard: React.FC = () => {
                         <div className="flex items-center space-x-4">
                           <div className="w-12 h-12 bg-gradient-to-r from-gray-800 to-gray-700 dark:from-yellow-500 dark:to-yellow-400 rounded-full flex items-center justify-center">
                             <img 
-                              src="/pludo_svg_logo.svg" 
+                              src="https://pludo.online/pludo_svg_logo.svg" 
                               alt="PLUDO.AI Logo" 
                               className="w-6 h-6"
                             />
@@ -380,7 +401,11 @@ export const Dashboard: React.FC = () => {
                 Agent configuration settings will be available here. You can update your agent's
                 information, personality, and behavior.
               </p>
-              <Button variant="outline">
+              <Button 
+                variant="outline"
+                onClick={() => agents.length > 0 && handleEditAgent(agents[0].id)}
+                disabled={agents.length === 0}
+              >
                 <Edit className="w-4 h-4 mr-2" />
                 Edit Agent Settings
               </Button>
@@ -394,19 +419,80 @@ export const Dashboard: React.FC = () => {
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-6">
               Memory Editor
             </h3>
-            <div className="space-y-4">
-              <p className="text-gray-600 dark:text-gray-400">
-                Add or edit your agent's knowledge base. This information will be used to 
-                provide more accurate and personalized responses.
-              </p>
-              <textarea
-                className="w-full h-64 p-4 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
-                placeholder="Add knowledge entries here..."
-              />
-              <Button className="bg-gradient-to-r from-gray-800 to-gray-700 dark:from-yellow-500 dark:to-yellow-400 hover:from-gray-700 hover:to-gray-600 dark:hover:from-yellow-400 dark:hover:to-yellow-300 text-white dark:text-black font-bold">
-                Update Knowledge Base
-              </Button>
-            </div>
+            
+            {agents.length === 0 ? (
+              <div className="text-center py-8">
+                <Brain className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                <p className="text-gray-500 dark:text-gray-400 mb-4">No agents available for memory editing</p>
+                <Button onClick={handleCreateAgent} className="bg-gradient-to-r from-gray-800 to-gray-700 dark:from-yellow-500 dark:to-yellow-400 hover:from-gray-700 hover:to-gray-600 dark:hover:from-yellow-400 dark:hover:to-yellow-300 text-white dark:text-black font-bold">
+                  Create Your First Agent
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-6">
+                {/* Agent Selector */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Select Agent
+                  </label>
+                  <select
+                    value={selectedAgent?.id || ''}
+                    onChange={(e) => {
+                      const agent = agents.find(a => a.id === e.target.value);
+                      setSelectedAgent(agent || null);
+                      setKnowledgeContent(agent?.knowledge || '');
+                    }}
+                    className="block w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-gray-900 dark:text-white focus:border-yellow-500 focus:ring-2 focus:ring-yellow-500/20 focus:outline-none transition-all duration-200"
+                  >
+                    {agents.map((agent) => (
+                      <option key={agent.id} value={agent.id}>
+                        {agent.name} - {agent.brand_name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {selectedAgent && (
+                  <>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Knowledge Base for {selectedAgent.name}
+                      </label>
+                      <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+                        Add or edit your agent's knowledge base. This information will be used to 
+                        provide more accurate and personalized responses.
+                      </p>
+                      <Textarea
+                        value={knowledgeContent}
+                        onChange={(e) => setKnowledgeContent(e.target.value)}
+                        placeholder="Add knowledge entries here..."
+                        rows={12}
+                        className="w-full"
+                      />
+                    </div>
+
+                    <div className="flex items-center justify-between">
+                      <div className="text-sm text-gray-500 dark:text-gray-400">
+                        <span className="flex items-center">
+                          <Upload className="w-4 h-4 mr-1" />
+                          Will update knowledge base
+                        </span>
+                      </div>
+                      
+                      <Button 
+                        onClick={handleUpdateKnowledge}
+                        disabled={isUpdatingKnowledge}
+                        loading={isUpdatingKnowledge}
+                        className="bg-gradient-to-r from-gray-800 to-gray-700 dark:from-yellow-500 dark:to-yellow-400 hover:from-gray-700 hover:to-gray-600 dark:hover:from-yellow-400 dark:hover:to-yellow-300 text-white dark:text-black font-bold"
+                      >
+                        <Save className="w-4 h-4 mr-2" />
+                        Update Knowledge Base
+                      </Button>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
           </div>
         );
 
