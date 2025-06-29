@@ -18,14 +18,9 @@ export function isPublicHostedUrl(url: string): boolean {
     
     // Check if it's a Vercel URL
     if (hostname.endsWith('.vercel.app')) {
-      // Exclude preview/branch deployments (they typically have git branch names)
-      // Production deployments usually have shorter, cleaner names
-      const subdomain = hostname.replace('.vercel.app', '');
-      
-      // If it contains hyphens followed by random characters, it's likely a preview
-      // Production URLs are typically shorter and cleaner
-      const previewPattern = /-[a-z0-9]{8,}-[a-z0-9]+$/i;
-      return !previewPattern.test(subdomain);
+      // All .vercel.app URLs are considered public hosted URLs
+      // This includes both production and preview deployments
+      return true;
     }
     
     // Check if it's a custom domain (not vercel.app)
