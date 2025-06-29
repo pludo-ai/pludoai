@@ -30,6 +30,7 @@ import { Textarea } from '../components/ui/Textarea';
 import { Card } from '../components/ui/Card';
 import { useAuthStore } from '../store/authStore';
 import { generateAgentCode, uploadToRepository, deployToCloud, triggerDeploymentWithFile, regenerateAgent } from '../lib/deployment';
+import { validateSubdomain, generateSubdomainFromBrand } from '../lib/subdomain';
 import { supabase } from '../lib/supabase';
 import toast from 'react-hot-toast';
 
@@ -63,10 +64,10 @@ interface DeploymentStep {
 
 export const Create: React.FC = () => {
   const navigate = useNavigate();
-  const { user } = useAuthStore();
   const [searchParams] = useSearchParams();
   const editAgentId = searchParams.get('edit');
   const isEditMode = !!editAgentId;
+  const { user } = useAuthStore();
   
   // Form state
   const [formData, setFormData] = useState<Agent>({
@@ -103,6 +104,7 @@ export const Create: React.FC = () => {
   const [deploymentResult, setDeploymentResult] = useState<any>(null);
   const [isDeploying, setIsDeploying] = useState(false);
   const [showDeployment, setShowDeployment] = useState(false);
+  const [isLoadingAgent, setIsLoadingAgent] = useState(false);
   
   // Button states
   const [buttonStates, setButtonStates] = useState({
@@ -113,10 +115,17 @@ export const Create: React.FC = () => {
     updateAgent: false,
   });
 
-  // Trigger deployment timer
-  const [triggerTimer, setTriggerTimer] = useState(45);
-  const [showTriggerButton, setShowTriggerButton] = useState(false);
-  const [triggerEnabled, setTriggerEnabled] = useState(false);
+  // Subdomain validation
+  const [subdomainValidation, setSubdomainValidation] = useState<{
+    isValid: boolean;
+    isAvailable: boolean;
+    error?: string;
+    isChecking: boolean;
+  }>({
+    isValid: false,
+    isAvailable: false,
+    isChecking: false
+  });
 
   // API Provider options
   const apiProviders = [
@@ -145,14 +154,44 @@ export const Create: React.FC = () => {
     }
   ];
 
-  // Load agent data for editing
+  // Load agent data if in edit mode
   useEffect(() => {
     if (isEditMode && editAgentId && user) {
-      loadAgentForEditing(editAgentId);
+      loadAgentForEdit(editAgentId);
     }
   }, [isEditMode, editAgentId, user]);
 
-  const loadAgentForEditing = async (agentId: string) => {
+  // Auto-generate subdomain from brand name (only in create mode)
+  useEffect(() => {
+    if (!isEditMode && formData.brandName && !formData.subdomain) {
+      const newSubdomain = generateSubdomainFromBrand(formData.brandName);
+      setFormData(prev => ({ ...prev, subdomain: newSubdomain }));
+    }
+  }, [formData.brandName, isEditMode]);
+
+  // Validate subdomain when it changes
+  useEffect(() => {
+    if (formData.subdomain && formData.subdomain.length >= 3) {
+      validateSubdomainAvailability(formData.subdomain);
+    } else {
+      setSubdomainValidation({
+        isValid: false,
+        isAvailable: false,
+        isChecking: false
+      });
+    }
+  }, [formData.subdomain]);
+
+  // Update available models when API provider changes
+  useEffect(() => {
+    const provider = apiProviders.find(p => p.id === formData.apiProvider);
+    if (provider && provider.models.length > 0) {
+      setFormData(prev => ({ ...prev, model: provider.models[0].id }));
+    }
+  }, [formData.apiProvider]);
+
+  const loadAgentForEdit = async (agentId: string) => {
+    setIsLoadingAgent(true);
     try {
       const { data: agent, error } = await supabase
         .from('agents')
@@ -171,9 +210,12 @@ export const Create: React.FC = () => {
           agentType: agent.agent_type,
           roleDescription: agent.role_description,
           services: agent.services || [''],
-          faqs: agent.faqs || [{ id: `faq-${Math.random().toString(36).substr(2, 8)}`, question: '', answer: '' }],
-          primaryColor: agent.primary_color,
-          tone: agent.tone,
+          faqs: agent.faqs?.map((faq: any, index: number) => ({
+            ...faq,
+            id: faq.id || `faq-${index}-${Math.random().toString(36).substr(2, 8)}`
+          })) || [{ id: `faq-${Math.random().toString(36).substr(2, 8)}`, question: '', answer: '' }],
+          primaryColor: agent.primary_color || '#eab308',
+          tone: agent.tone || 'professional',
           avatarUrl: agent.avatar_url || '',
           officeHours: agent.office_hours || '',
           knowledge: agent.knowledge || '',
@@ -186,47 +228,33 @@ export const Create: React.FC = () => {
         setCurrentAgentId(agentId);
       }
     } catch (error: any) {
-      toast.error('Failed to load agent data: ' + error.message);
+      toast.error('Failed to load agent: ' + error.message);
       navigate('/dashboard');
+    } finally {
+      setIsLoadingAgent(false);
     }
   };
 
-  // Auto-generate subdomain from brand name (only for new agents)
-  useEffect(() => {
-    if (!isEditMode && formData.brandName) {
-      const newSubdomain = generateSubdomain(formData.brandName);
-      setFormData(prev => ({ ...prev, subdomain: newSubdomain }));
-    }
-  }, [formData.brandName, isEditMode]);
-
-  // Update available models when API provider changes
-  useEffect(() => {
-    const provider = apiProviders.find(p => p.id === formData.apiProvider);
-    if (provider && provider.models.length > 0) {
-      setFormData(prev => ({ ...prev, model: provider.models[0].id }));
-    }
-  }, [formData.apiProvider]);
-
-  // Trigger deployment timer effect
-  useEffect(() => {
-    let interval: NodeJS.Timeout;
+  const validateSubdomainAvailability = async (subdomain: string) => {
+    setSubdomainValidation(prev => ({ ...prev, isChecking: true }));
     
-    if (showTriggerButton && !triggerEnabled && triggerTimer > 0) {
-      interval = setInterval(() => {
-        setTriggerTimer(prev => {
-          if (prev <= 1) {
-            setTriggerEnabled(true);
-            return 0;
-          }
-          return prev - 1;
-        });
-      }, 1000);
+    try {
+      const result = await validateSubdomain(subdomain);
+      setSubdomainValidation({
+        isValid: result.isValid,
+        isAvailable: result.isAvailable,
+        error: result.error,
+        isChecking: false
+      });
+    } catch (error) {
+      setSubdomainValidation({
+        isValid: false,
+        isAvailable: false,
+        error: 'Failed to validate subdomain',
+        isChecking: false
+      });
     }
-
-    return () => {
-      if (interval) clearInterval(interval);
-    };
-  }, [showTriggerButton, triggerEnabled, triggerTimer]);
+  };
 
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -324,6 +352,10 @@ export const Create: React.FC = () => {
       toast.error('Custom model name is required');
       return false;
     }
+    if (!isEditMode && (!subdomainValidation.isValid || !subdomainValidation.isAvailable)) {
+      toast.error('Please choose a valid and available subdomain');
+      return false;
+    }
     return true;
   };
 
@@ -336,8 +368,12 @@ export const Create: React.FC = () => {
 
     setIsDeploying(true);
     setButtonLoading('updateAgent', true);
+    setShowDeployment(true);
+    resetDeploymentSteps();
 
     try {
+      updateDeploymentStep('step-1', 'loading', 'Updating agent configuration...');
+
       // Use custom model if selected
       const finalModel = formData.model === 'custom' ? formData.customModel : formData.model;
 
@@ -366,17 +402,25 @@ export const Create: React.FC = () => {
 
       if (updateError) throw updateError;
 
+      updateDeploymentStep('step-1', 'success', 'Agent configuration updated');
+
       // Regenerate and update repository
+      updateDeploymentStep('step-2', 'loading', 'Updating repository...');
+
       const result = await regenerateAgent(currentAgentId);
 
       if (result.success) {
+        updateDeploymentStep('step-2', 'success', 'Repository updated successfully');
+        updateDeploymentStep('step-3', 'success', 'Agent updated and deployed');
+        setDeploymentResult(result);
         toast.success('Agent updated successfully!');
-        navigate('/dashboard');
       } else {
-        toast.error(result.error || 'Failed to update agent');
+        updateDeploymentStep('step-2', 'error', result.error);
+        toast.error(result.error || 'Failed to update repository');
       }
     } catch (error: any) {
-      toast.error('Failed to update agent: ' + error.message);
+      updateDeploymentStep('step-1', 'error', error.message);
+      toast.error('Failed to update agent');
     } finally {
       setIsDeploying(false);
       setButtonLoading('updateAgent', false);
@@ -398,15 +442,11 @@ export const Create: React.FC = () => {
     try {
       updateDeploymentStep('step-1', 'loading', 'Generating agent code...');
 
-      // Ensure subdomain is generated if not already
-      const finalSubdomain = formData.subdomain || generateSubdomain(formData.brandName);
-
       // Use custom model if selected
       const finalModel = formData.model === 'custom' ? formData.customModel : formData.model;
 
       const config = {
         ...formData,
-        subdomain: finalSubdomain,
         model: finalModel,
         services: formData.services.filter(s => s.trim()),
         faqs: formData.faqs.filter(faq => faq.question.trim() && faq.answer.trim()),
@@ -473,11 +513,6 @@ export const Create: React.FC = () => {
     setIsDeploying(true);
     setButtonLoading('deployCloud', true);
 
-    // Show trigger button immediately and start timer
-    setShowTriggerButton(true);
-    setTriggerEnabled(false);
-    setTriggerTimer(45);
-
     try {
       updateDeploymentStep('step-3', 'loading', 'Deploying to cloud...');
 
@@ -487,13 +522,16 @@ export const Create: React.FC = () => {
         updateDeploymentStep('step-3', 'success', 'Deployed to cloud successfully');
         setDeploymentResult(prev => ({ ...prev, ...result }));
         toast.success('Agent deployed successfully!');
-        
-        // Hide trigger button if deployment was successful
-        setShowTriggerButton(false);
       } else {
         updateDeploymentStep('step-3', 'error', result.error);
         toast.error('Failed to deploy to cloud');
       }
+
+      // Show trigger button after 45 seconds regardless of success/failure
+      setTimeout(() => {
+        setButtonStates(prev => ({ ...prev, makeItLive: true }));
+      }, 45000);
+
     } catch (error: any) {
       updateDeploymentStep('step-3', 'error', error.message);
       toast.error('Failed to deploy to cloud');
@@ -523,9 +561,6 @@ export const Create: React.FC = () => {
         if (result.vercelUrl) {
           setDeploymentResult(prev => ({ ...prev, ...result }));
         }
-        
-        // Hide trigger button after successful trigger
-        setShowTriggerButton(false);
       } else {
         toast.error(result.error || 'Failed to trigger deployment', { id: 'make-live' });
       }
@@ -539,15 +574,6 @@ export const Create: React.FC = () => {
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
     toast.success('Copied to clipboard!');
-  };
-
-  // Helper function to generate a unique subdomain
-  const generateSubdomain = (brandName: string): string => {
-    const cleanBrandName = brandName.toLowerCase().replace(/[^a-z0-9]/g, '-').substring(0, 20);
-    const userSuffix = user?.id.slice(-4) || Math.random().toString(36).substr(2, 4);
-    const randomSuffix = Math.random().toString(36).substr(2, 4);
-    const timestamp = Date.now().toString().slice(-6);
-    return `${cleanBrandName}-ai-agent-${userSuffix}-${randomSuffix}-${timestamp}`;
   };
 
   const getStepIcon = (status: DeploymentStep['status']) => {
@@ -576,7 +602,8 @@ export const Create: React.FC = () => {
   const isGenerateCodeDisabled = buttonStates.generateCode || isDeploying;
   const isUploadRepoDisabled = buttonStates.uploadRepo || isDeploying || deploymentSteps[0]?.status !== 'success';
   const isDeployCloudDisabled = buttonStates.deployCloud || isDeploying || deploymentSteps[1]?.status !== 'success';
-  const isMakeItLiveDisabled = buttonStates.makeItLive || !showTriggerButton || !triggerEnabled;
+  const isMakeItLiveDisabled = buttonStates.makeItLive || !deploymentResult?.githubRepo;
+  const isUpdateAgentDisabled = buttonStates.updateAgent || isDeploying;
 
   if (!user) {
     return (
@@ -601,6 +628,17 @@ export const Create: React.FC = () => {
     );
   }
 
+  if (isLoadingAgent) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-white dark:bg-[#0A0A0A] pt-16 transition-colors duration-300">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-yellow-500 mx-auto mb-4"></div>
+          <p className="text-gray-500 dark:text-gray-400">Loading agent...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-white dark:bg-[#0A0A0A] pt-16 transition-colors duration-300">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -619,7 +657,7 @@ export const Create: React.FC = () => {
             </h1>
             <p className="text-xl text-gray-600 dark:text-gray-400 max-w-3xl mx-auto">
               {isEditMode 
-                ? 'Update your intelligent AI assistant configuration and settings.'
+                ? 'Update your AI assistant configuration and deploy changes.'
                 : 'Design, customize, and deploy your intelligent AI assistant in minutes. No coding required.'
               }
             </p>
@@ -701,33 +739,58 @@ export const Create: React.FC = () => {
                   />
                 </div>
 
-                {/* Auto-generated Subdomain Display */}
-                {formData.subdomain && (
-                  <div className="mt-6">
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                      Generated Subdomain
-                    </label>
-                    <div className="flex items-center space-x-2 p-3 bg-gray-100 dark:bg-gray-800 rounded-lg">
-                      <code className="text-sm text-gray-600 dark:text-gray-300 flex-1">
-                        {formData.subdomain}
-                      </code>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => copyToClipboard(formData.subdomain)}
-                      >
-                        <Copy className="w-4 h-4" />
-                      </Button>
+                {/* Subdomain Configuration */}
+                <div className="mt-6">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Custom Domain
+                  </label>
+                  <div className="flex items-center space-x-2">
+                    <div className="flex-1 relative">
+                      <Input
+                        value={formData.subdomain}
+                        onChange={(e) => handleInputChange('subdomain', e.target.value.toLowerCase())}
+                        placeholder="your-brand"
+                        disabled={isEditMode}
+                        className={`pr-32 ${
+                          subdomainValidation.isChecking ? 'border-yellow-500' :
+                          subdomainValidation.isValid && subdomainValidation.isAvailable ? 'border-green-500' :
+                          subdomainValidation.error ? 'border-red-500' : ''
+                        }`}
+                      />
+                      <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-sm text-gray-500 dark:text-gray-400">
+                        .pludo.online
+                      </div>
                     </div>
-                    <p className="text-xs text-gray-500 mt-1">
-                      This unique identifier is automatically generated for your agent
-                    </p>
+                    {subdomainValidation.isChecking && (
+                      <div className="w-5 h-5 border-2 border-yellow-500 border-t-transparent rounded-full animate-spin" />
+                    )}
+                    {subdomainValidation.isValid && subdomainValidation.isAvailable && (
+                      <CheckCircle className="w-5 h-5 text-green-500" />
+                    )}
+                    {subdomainValidation.error && (
+                      <AlertCircle className="w-5 h-5 text-red-500" />
+                    )}
                   </div>
-                )}
+                  {subdomainValidation.error && (
+                    <p className="text-sm text-red-600 dark:text-red-400 mt-1">
+                      {subdomainValidation.error}
+                    </p>
+                  )}
+                  {subdomainValidation.isValid && subdomainValidation.isAvailable && (
+                    <p className="text-sm text-green-600 dark:text-green-400 mt-1">
+                      ✓ Available! Your agent will be hosted at {formData.subdomain}.pludo.online
+                    </p>
+                  )}
+                  {isEditMode && (
+                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                      Domain cannot be changed after creation
+                    </p>
+                  )}
+                </div>
               </div>
             </motion.div>
 
-            {/* AI Configuration */}
+            {/* API Configuration */}
             <motion.div
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
@@ -744,7 +807,7 @@ export const Create: React.FC = () => {
                 </div>
 
                 <div className="space-y-6">
-                  {/* AI Provider Selection */}
+                  {/* API Provider Selection */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
                       AI Provider
@@ -835,12 +898,12 @@ export const Create: React.FC = () => {
                           <strong>Secure:</strong> Your API key is encrypted and stored securely. It's only used to power your AI agent's conversations.
                           {formData.apiProvider === 'openrouter' && (
                             <div className="mt-1">
-                              Get your API key from the provider dashboard
+                              Get your API key from <a href="https://openrouter.ai/keys" target="_blank" rel="noopener noreferrer" className="underline">the provider dashboard</a>
                             </div>
                           )}
                           {formData.apiProvider === 'gemini' && (
                             <div className="mt-1">
-                              Get your API key from Google AI Studio
+                              Get your API key from <a href="https://makersuite.google.com/app/apikey" target="_blank" rel="noopener noreferrer" className="underline">the provider console</a>
                             </div>
                           )}
                         </div>
@@ -1102,6 +1165,12 @@ export const Create: React.FC = () => {
                     <div className="text-xs text-gray-500 space-y-1">
                       <div>Tone: {formData.tone} • Type: {formData.agentType.replace('-', ' ')}</div>
                       <div>AI: {getCurrentProvider()?.name} • Model: {getCurrentModels().find(m => m.id === formData.model)?.name || (formData.model === 'custom' ? formData.customModel : formData.model)}</div>
+                      {formData.subdomain && (
+                        <div className="flex items-center space-x-1">
+                          <Globe className="w-3 h-3" />
+                          <span>{formData.subdomain}.pludo.online</span>
+                        </div>
+                      )}
                     </div>
                   </div>
 
@@ -1109,7 +1178,7 @@ export const Create: React.FC = () => {
                     {isEditMode ? (
                       <Button
                         onClick={handleUpdateAgent}
-                        disabled={buttonStates.updateAgent}
+                        disabled={isUpdateAgentDisabled}
                         className="w-full bg-gradient-to-r from-gray-800 to-gray-700 dark:from-yellow-500 dark:to-yellow-400 hover:from-gray-700 hover:to-gray-600 dark:hover:from-yellow-400 dark:hover:to-yellow-300 text-white dark:text-black font-bold"
                         loading={buttonStates.updateAgent}
                       >
@@ -1135,7 +1204,7 @@ export const Create: React.FC = () => {
                           className="w-full"
                           loading={buttonStates.uploadRepo}
                         >
-                          <Upload className="w-4 h-4 mr-2" />
+                          <Server className="w-4 h-4 mr-2" />
                           Upload to Repository
                         </Button>
 
@@ -1146,24 +1215,20 @@ export const Create: React.FC = () => {
                           className="w-full"
                           loading={buttonStates.deployCloud}
                         >
-                          <Globe className="w-4 h-4 mr-2" />
+                          <Cloud className="w-4 h-4 mr-2" />
                           Deploy to Cloud
                         </Button>
 
-                        {/* Trigger Deployment Button */}
-                        {showTriggerButton && (
+                        {/* Make it Live Button */}
+                        {deploymentResult?.githubRepo && buttonStates.makeItLive && (
                           <Button
                             onClick={handleMakeItLive}
                             disabled={isMakeItLiveDisabled}
-                            className={`w-full font-bold ${
-                              triggerEnabled
-                                ? 'bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white'
-                                : 'bg-gray-400 dark:bg-gray-600 text-gray-600 dark:text-gray-400 cursor-not-allowed'
-                            }`}
+                            className="w-full bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white"
                             loading={buttonStates.makeItLive}
                           >
                             <Zap className="w-4 h-4 mr-2" />
-                            {triggerEnabled ? 'Trigger Deployment' : `Wait ${triggerTimer}s`}
+                            Trigger Deployment
                           </Button>
                         )}
                       </>
@@ -1173,7 +1238,7 @@ export const Create: React.FC = () => {
               </motion.div>
 
               {/* Deployment Progress */}
-              {showDeployment && !isEditMode && (
+              {showDeployment && (
                 <motion.div
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
@@ -1181,7 +1246,7 @@ export const Create: React.FC = () => {
                 >
                   <div className="bg-gradient-to-br from-gray-50 via-white to-gray-100 dark:from-[#1A1A1A] dark:via-[#0A0A0A] dark:to-black border border-gray-300/50 dark:border-yellow-500/30 rounded-2xl shadow-2xl shadow-gray-400/20 dark:shadow-yellow-500/20 p-6 transition-all duration-300">
                     <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-                      Deployment Progress
+                      {isEditMode ? 'Update Progress' : 'Deployment Progress'}
                     </h3>
                     
                     <div className="space-y-4">
@@ -1212,7 +1277,7 @@ export const Create: React.FC = () => {
                     {deploymentResult && (
                       <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
                         <h4 className="font-medium text-gray-900 dark:text-white mb-3">
-                          Deployment Results
+                          {isEditMode ? 'Update Results' : 'Deployment Results'}
                         </h4>
                         
                         <div className="space-y-3">

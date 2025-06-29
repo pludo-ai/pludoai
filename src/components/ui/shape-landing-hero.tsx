@@ -571,7 +571,6 @@ export function HeroGeometric({
                     </div>
                 </div>
 
-
                 {/* Gradient Overlays */}
                 <div className={`absolute inset-0 pointer-events-none ${
                     isDark 

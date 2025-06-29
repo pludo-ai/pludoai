@@ -18,7 +18,7 @@ interface AgentConfig {
   model: string;
 }
 
-export function generateAgentFiles(config: AgentConfig, vercelUrl?: string): { path: string; content: string }[] {
+export function generateAgentFiles(config: AgentConfig, deploymentUrl?: string): { path: string; content: string }[] {
   // Use default avatar if none provided
   const defaultAvatarUrl = 'https://pludo.online/pludo_svg_logo.svg';
   const finalAvatarUrl = config.avatarUrl && config.avatarUrl.trim() ? config.avatarUrl : defaultAvatarUrl;
@@ -274,7 +274,7 @@ body {
     },
     {
       path: 'public/widget.js',
-      content: generateWidgetScript(config, vercelUrl)
+      content: generateWidgetScript(config, deploymentUrl)
     },
     {
       path: 'public/vite.svg',
@@ -410,7 +410,6 @@ function App() {
               className="bg-white p-8 rounded-2xl shadow-lg"
             >
               <h3 className="text-2xl font-bold text-gray-900 mb-6 flex items-center">
-                
                 <MessageCircle className="w-6 h-6 text-primary-600 mr-2" />
                 Quick Questions
               </h3>
@@ -705,6 +704,7 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({ isOpen, onClose, config 
                         backgroundColor: message.isUser ? '#3b82f6' : '#d1d5db'
                       }}>
                         {message.isUser ? (
+                          
                           <User style={{ width: '16px', height: '16px', color: 'white' }} />
                         ) : (
                           <Bot style={{ width: '16px', height: '16px', color: '#6b7280' }} />
@@ -1055,9 +1055,9 @@ function generateConfigFile(config: AgentConfig): string {
 export default agentConfig;`;
 }
 
-function generateWidgetScript(config: AgentConfig, vercelUrl?: string): string {
-  // Use the provided vercelUrl or fall back to a placeholder that will be replaced during deployment
-  const baseUrl = vercelUrl || '{{DEPLOYMENT_URL}}';
+function generateWidgetScript(config: AgentConfig, deploymentUrl?: string): string {
+  // Use the provided deploymentUrl or fall back to a placeholder that will be replaced during deployment
+  const baseUrl = deploymentUrl || '{{DEPLOYMENT_URL}}';
   
   return `(function() {
   'use strict';
@@ -1152,7 +1152,7 @@ ${config.roleDescription}
 
 ## Features
 
-- 🤖 Intelligent AI-powered conversations using ${config.apiProvider === 'openrouter' ? 'OpenRouter' : 'Google Gemini'}
+- 🤖 Intelligent AI-powered conversations using ${config.apiProvider === 'openrouter' ? 'advanced AI models' : 'Google Gemini'}
 - 💬 Real-time chat interface
 - 📱 Mobile-responsive design
 - 🎨 Custom branded experience
@@ -1160,7 +1160,7 @@ ${config.roleDescription}
 
 ## AI Configuration
 
-- **Provider**: ${config.apiProvider === 'openrouter' ? 'OpenRouter' : 'Google Gemini'}
+- **Provider**: ${config.apiProvider === 'openrouter' ? 'Advanced AI Models' : 'Google Gemini'}
 - **Model**: ${config.model}
 - **Tone**: ${config.tone}
 
@@ -1205,7 +1205,7 @@ The AI assistant is configured with:
 - **Brand**: ${config.brandName}
 - **Tone**: ${config.tone}
 - **Primary Color**: ${config.primaryColor}
-- **API Provider**: ${config.apiProvider === 'openrouter' ? 'OpenRouter' : 'Google Gemini'}
+- **API Provider**: ${config.apiProvider === 'openrouter' ? 'Advanced AI Models' : 'Google Gemini'}
 - **Model**: ${config.model}
 ${config.officeHours ? `- **Office Hours**: ${config.officeHours}` : ''}
 
@@ -1226,7 +1226,7 @@ The following environment variables are configured:
 ## Powered By
 
 - **PLUDO.AI** - No-code AI agent generator
-- **${config.apiProvider === 'openrouter' ? 'OpenRouter' : 'Google Gemini'}** - AI model API
+- **${config.apiProvider === 'openrouter' ? 'Advanced AI Models' : 'Google Gemini'}** - AI model API
 - **Cloud Platform** - Hosting and deployment
 - **React** - Frontend framework
 - **Tailwind CSS** - Styling
