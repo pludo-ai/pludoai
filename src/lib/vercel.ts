@@ -117,7 +117,7 @@ class VercelService {
     console.log('⏳ Waiting for automatic deployment to start...');
     
     // Wait for automatic deployment to be triggered by GitHub webhook
-    const deploymentWaitTime = 40000; // 1 minute for auto-deployment
+    const deploymentWaitTime = 90000; // 1.5 minutes for auto-deployment
     while (!deploymentFound && (Date.now() - startTime) < deploymentWaitTime) {
       try {
         const { deployments } = await this.getDeployments(projectId);
@@ -129,10 +129,10 @@ class VercelService {
         }
         
         console.log('⏳ Waiting for automatic deployment...');
-        await new Promise(resolve => setTimeout(resolve, 10000));
+        await new Promise(resolve => setTimeout(resolve, 15000)); // Check every 15 seconds
       } catch (error: any) {
         console.error('Error checking for deployments:', error);
-        await new Promise(resolve => setTimeout(resolve, 10000));
+        await new Promise(resolve => setTimeout(resolve, 15000));
       }
     }
 
@@ -141,7 +141,7 @@ class VercelService {
       const project = await this.getProject(projectId);
       const projectUrl = `https://vercel.com/dashboard/projects/${project.id}`;
       
-      throw new Error(`Automatic deployment did not start within 1 minute. Manual trigger may be needed. Dashboard: ${projectUrl}`);
+      throw new Error(`Automatic deployment did not start within 1.5 minutes. Manual trigger may be needed. Dashboard: ${projectUrl}`);
     }
     
     // Monitor the deployment progress
@@ -195,6 +195,33 @@ class VercelService {
     throw new Error(`Deployment timeout after ${maxWaitTime/1000} seconds. Please visit ${projectUrl} to check the deployment status and manually trigger if needed.`);
   }
 
+  // Helper method to trigger a production deployment
+  async triggerProductionDeployment(projectId: string): Promise<void> {
+    try {
+      console.log('🚀 Triggering production deployment to main branch...');
+      
+      // Trigger a deployment to the main branch
+      await this.request('/v13/deployments', {
+        method: 'POST',
+        body: JSON.stringify({
+          name: 'production',
+          projectId: projectId,
+          target: 'production',
+          gitSource: {
+            type: 'github',
+            ref: 'main',
+            sha: 'HEAD'
+          }
+        }),
+      });
+      
+      console.log('✅ Production deployment triggered successfully');
+    } catch (error: any) {
+      console.error('Error triggering production deployment:', error);
+      // Don't throw error, just log it
+    }
+  }
+
   // Helper method to get production URL
   async getProductionUrl(projectId: string, previewUrl: string): Promise<string | null> {
     try {
@@ -204,12 +231,14 @@ class VercelService {
       for (const deployment of deployments) {
         if (deployment.readyState === 'READY') {
           const url = deployment.url;
-          // Check if this is a production URL (no additional suffixes like -8q017hj16-pludos-projects)
+          // Check if this is a production URL (no additional suffixes like -581r74bmo-pludos-projects)
           if (url && url.includes('.vercel.app')) {
             const subdomain = url.replace('.vercel.app', '');
-            const previewPattern = /-[a-z0-9]{8,}-[a-z0-9-]+$/i;
             
-            if (!previewPattern.test(subdomain)) {
+            // Production URLs should be clean without the pludos-projects suffix
+            // Example: cursor-ai-agent-6db0-y2oo-161163 (production)
+            // vs: cursor-ai-agent-6db0-y2oo-161163-581r74bmo-pludos-projects (preview)
+            if (!subdomain.includes('-pludos-projects')) {
               console.log('✅ Found production URL:', url);
               return `https://${url}`;
             }
@@ -217,8 +246,28 @@ class VercelService {
         }
       }
       
-      // If no production URL found, return null to use the preview URL
-      console.log('⚠️ No production URL found, using preview URL');
+      // If no production URL found, try to trigger a production deployment
+      console.log('⚠️ No production URL found, attempting to trigger production deployment...');
+      await this.triggerProductionDeployment(projectId);
+      
+      // Wait a bit and check again
+      await new Promise(resolve => setTimeout(resolve, 30000));
+      
+      const { deployments: newDeployments } = await this.getDeployments(projectId);
+      for (const deployment of newDeployments) {
+        if (deployment.readyState === 'READY') {
+          const url = deployment.url;
+          if (url && url.includes('.vercel.app')) {
+            const subdomain = url.replace('.vercel.app', '');
+            if (!subdomain.includes('-pludos-projects')) {
+              console.log('✅ Found production URL after trigger:', url);
+              return `https://${url}`;
+            }
+          }
+        }
+      }
+      
+      console.log('⚠️ Still no production URL found, using preview URL');
       return null;
     } catch (error: any) {
       console.error('Error getting production URL:', error);
