@@ -117,7 +117,7 @@ class VercelService {
     console.log('⏳ Waiting for automatic deployment to start...');
     
     // Wait for automatic deployment to be triggered by GitHub webhook
-    const deploymentWaitTime = 60000; // 1 minute for auto-deployment
+    const deploymentWaitTime = 40000; // 1 minute for auto-deployment
     while (!deploymentFound && (Date.now() - startTime) < deploymentWaitTime) {
       try {
         const { deployments } = await this.getDeployments(projectId);
@@ -130,7 +130,7 @@ class VercelService {
         
         console.log('⏳ Waiting for automatic deployment...');
         await new Promise(resolve => setTimeout(resolve, 10000));
-      } catch (error) {
+      } catch (error: any) {
         console.error('Error checking for deployments:', error);
         await new Promise(resolve => setTimeout(resolve, 10000));
       }
@@ -158,8 +158,9 @@ class VercelService {
           }
           
           if (deployment.readyState === 'READY') {
-            // Return the public hosted URL in the format requested
-            const publicUrl = `https://${deployment.url}`;
+            // Try to get the production URL instead of preview URL
+            const productionUrl = await this.getProductionUrl(projectId, deployment.url);
+            const publicUrl = productionUrl || `https://${deployment.url}`;
             console.log(`🎉 Deployment ready: ${publicUrl}`);
             return publicUrl;
           }
@@ -177,7 +178,7 @@ class VercelService {
         } else {
           console.log('⏳ No deployments found, waiting...');
         }
-      } catch (error) {
+      } catch (error: any) {
         if (error.message.includes('Deployment failed')) {
           throw error; // Re-throw deployment failures
         }
@@ -192,6 +193,37 @@ class VercelService {
     const project = await this.getProject(projectId);
     const projectUrl = `https://vercel.com/dashboard/projects/${project.id}`;
     throw new Error(`Deployment timeout after ${maxWaitTime/1000} seconds. Please visit ${projectUrl} to check the deployment status and manually trigger if needed.`);
+  }
+
+  // Helper method to get production URL
+  async getProductionUrl(projectId: string, previewUrl: string): Promise<string | null> {
+    try {
+      const { deployments } = await this.getDeployments(projectId);
+      
+      // Look for a production deployment (clean URL without preview suffixes)
+      for (const deployment of deployments) {
+        if (deployment.readyState === 'READY') {
+          const url = deployment.url;
+          // Check if this is a production URL (no additional suffixes like -8q017hj16-pludos-projects)
+          if (url && url.includes('.vercel.app')) {
+            const subdomain = url.replace('.vercel.app', '');
+            const previewPattern = /-[a-z0-9]{8,}-[a-z0-9-]+$/i;
+            
+            if (!previewPattern.test(subdomain)) {
+              console.log('✅ Found production URL:', url);
+              return `https://${url}`;
+            }
+          }
+        }
+      }
+      
+      // If no production URL found, return null to use the preview URL
+      console.log('⚠️ No production URL found, using preview URL');
+      return null;
+    } catch (error: any) {
+      console.error('Error getting production URL:', error);
+      return null;
+    }
   }
 
   // Helper method to check if a project exists
@@ -212,13 +244,14 @@ class VercelService {
       if (deployments.length > 0) {
         const latestDeployment = deployments[0];
         if (latestDeployment.readyState === 'READY') {
-          // Return public hosted URL format
-          return `https://${latestDeployment.url}`;
+          // Try to get production URL first
+          const productionUrl = await this.getProductionUrl(projectId, latestDeployment.url);
+          return productionUrl || `https://${latestDeployment.url}`;
         }
       }
       
       return null;
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error getting latest deployment URL:', error);
       return null;
     }
