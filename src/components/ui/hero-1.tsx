@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { Dialog, DialogContent } from './dialog'
-import { Menu, X, Crown } from 'lucide-react'
+import { Menu, X, Crown, Sun, Moon } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { useAuthStore } from '../../store/authStore'
 import { useThemeStore } from '../../store/themeStore'
@@ -166,8 +166,9 @@ export function HeroLanding(props: HeroLandingProps) {
         />
       </div>
 
-      <header className="absolute inset-x-0 top-0 z-50">
-        <nav aria-label="Global" className="flex items-center justify-between p-4 sm:p-6 lg:px-8">
+      {/* Fixed Navigation Header */}
+      <header className="fixed inset-x-0 top-0 z-50 bg-brand-dark/90 backdrop-blur-2xl border-b border-brand-gold/20">
+        <nav aria-label="Global" className="flex items-center justify-between p-4 sm:p-6 lg:px-8 h-20">
           <div className="flex lg:flex-1">
             <Link to="/" className="flex items-center space-x-3 group">
               <div className="relative p-3 bg-gradient-to-r from-brand-gold to-brand-light-gold rounded-2xl shadow-lg shadow-brand-gold/30 group-hover:shadow-brand-gold/50 transition-all duration-300">
@@ -222,6 +223,14 @@ export function HeroLanding(props: HeroLandingProps) {
                 </Link>
               )
             )}
+            
+            {/* Theme Toggle */}
+            <button
+              onClick={toggleTheme}
+              className="p-3 text-gray-300 hover:text-brand-gold transition-colors duration-300 rounded-xl hover:bg-brand-gold/10"
+            >
+              {isDark ? <Sun className="w-6 h-6" /> : <Moon className="w-6 h-6" />}
+            </button>
           </div>
         </nav>
         
@@ -261,9 +270,9 @@ export function HeroLanding(props: HeroLandingProps) {
                     ))}
                   </div>
                 )}
-                <div className="py-6">
+                <div className="py-6 space-y-2">
                   {user ? (
-                    <div className="space-y-2">
+                    <>
                       <Link
                         to="/dashboard"
                         className="-mx-3 block rounded-lg px-3 py-2.5 text-base font-semibold text-gray-200 hover:bg-brand-gold/10 hover:text-brand-gold transition-colors"
@@ -278,7 +287,7 @@ export function HeroLanding(props: HeroLandingProps) {
                       >
                         Create Agent
                       </Link>
-                    </div>
+                    </>
                   ) : (
                     loginText && loginHref && (
                       <Link
@@ -290,6 +299,24 @@ export function HeroLanding(props: HeroLandingProps) {
                       </Link>
                     )
                   )}
+                  
+                  {/* Mobile Theme Toggle */}
+                  <button
+                    onClick={() => {
+                      toggleTheme();
+                      setMobileMenuOpen(false);
+                    }}
+                    className="-mx-3 flex items-center justify-between w-full rounded-lg px-3 py-2.5 text-base font-semibold text-gray-200 hover:bg-brand-gold/10 hover:text-brand-gold transition-colors"
+                  >
+                    <span>{isDark ? 'Light Mode' : 'Dark Mode'}</span>
+                    <div className="p-2 bg-gradient-to-r from-brand-gold/20 to-brand-silver/20 rounded-lg">
+                      {isDark ? (
+                        <Sun className="w-5 h-5 text-brand-gold" />
+                      ) : (
+                        <Moon className="w-5 h-5 text-brand-silver" />
+                      )}
+                    </div>
+                  </button>
                 </div>
               </div>
             </div>
@@ -297,7 +324,8 @@ export function HeroLanding(props: HeroLandingProps) {
         </Dialog>
       </header>
 
-      <div className="relative isolate px-6 pt-4 overflow-hidden min-h-screen flex flex-col justify-center">        
+      {/* Hero Content with proper top padding to account for fixed header */}
+      <div className="relative isolate px-6 pt-20 overflow-hidden min-h-screen flex flex-col justify-center">        
         <div className="mx-auto max-w-6xl pt-20 sm:pt-32">
           {/* Announcement banner */}
           {announcementBanner && (
