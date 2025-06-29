@@ -11,7 +11,11 @@ export const Footer: React.FC = () => {
           <div className="col-span-1 md:col-span-2">
             <div className="flex items-center space-x-2 mb-4">
               <div className="p-2 bg-gradient-to-r from-yellow-600 to-yellow-500 dark:from-yellow-500 dark:to-yellow-400 rounded-xl">
-                <Bot className="w-6 h-6 text-white dark:text-black" />
+                <img 
+                  src="/pludo_svg_logo.svg" 
+                  alt="PLUDO.AI Logo" 
+                  className="w-6 h-6"
+                />
               </div>
               <span className="text-xl font-bold bg-gradient-to-r from-yellow-400 to-yellow-500 dark:from-yellow-400 dark:to-yellow-500 bg-clip-text text-transparent">
                 PLUDO.AI

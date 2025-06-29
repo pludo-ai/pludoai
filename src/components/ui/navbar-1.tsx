@@ -45,9 +45,16 @@ const Navbar1 = () => {
             <Link to="/" className="flex items-center space-x-3">
               {/* Luxury Logo with Gold/Silver Gradient */}
               <div className="relative">
-                <div className="w-10 h-10 bg-gradient-to-br from-brand-gold via-brand-light-gold to-brand-silver rounded-xl flex items-center justify-center shadow-lg shadow-brand-gold/30 border border-brand-gold/50">
-                  <Crown className="w-6 h-6 text-brand-dark" />
-                </div>
+                <motion.div
+                  whileHover={{ rotate: 360, scale: 1.1 }}
+                  transition={{ duration: 0.6, ease: "easeInOut" }}
+                >
+                  <img 
+                    src="/pludo_svg_logo.svg" 
+                    alt="PLUDO.AI Logo" 
+                    className="w-10 h-10"
+                  />
+                </motion.div>
                 <div className="absolute -top-1 -right-1 w-3 h-3 bg-brand-silver rounded-full animate-pulse-slow" />
               </div>
               
@@ -144,7 +151,11 @@ const Navbar1 = () => {
                   size="sm"
                   className="bg-gradient-to-r from-brand-gold to-brand-light-gold hover:from-brand-light-gold hover:to-brand-gold text-brand-dark font-bold px-6 py-3 rounded-xl shadow-lg shadow-brand-gold/30 border border-brand-gold/50"
                 >
-                  <Crown className="w-4 h-4 mr-2" />
+                  <img 
+                    src="/pludo_svg_logo.svg" 
+                    alt="PLUDO.AI Logo" 
+                    className="w-4 h-4 mr-2"
+                  />
                   Begin Journey
                 </Button>
               </motion.div>
@@ -252,7 +263,11 @@ const Navbar1 = () => {
                       variant="primary" 
                       className="w-full bg-gradient-to-r from-brand-gold to-brand-light-gold hover:from-brand-light-gold hover:to-brand-gold text-brand-dark font-black py-4 text-xl rounded-xl shadow-2xl shadow-brand-gold/40 border-2 border-brand-gold"
                     >
-                      <Crown className="w-6 h-6 mr-3" />
+                      <img 
+                        src="/pludo_svg_logo.svg" 
+                        alt="PLUDO.AI Logo" 
+                        className="w-6 h-6 mr-3"
+                      />
                       Begin Journey
                     </Button>
                   </Link>

@@ -1,6 +1,4 @@
-"use client";
-
-import { useState } from "react";
+import React, { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { Crown, Menu, X, Sun, Moon } from "lucide-react";
 import { useAuthStore } from "../../store/authStore";
@@ -38,20 +36,13 @@ export function GeometricNavbar() {
                         <motion.div
                             whileHover={{ rotate: 360, scale: 1.1 }}
                             transition={{ duration: 0.6, ease: "easeInOut" }}
-                            className={`relative p-2 rounded-xl shadow-lg transition-all duration-300 ${
-                                isDark 
-                                    ? 'bg-gradient-to-r from-yellow-500 to-yellow-400 shadow-yellow-500/30 group-hover:shadow-yellow-500/50'
-                                    : 'bg-gradient-to-r from-gray-800 to-gray-700 shadow-gray-800/30 group-hover:shadow-gray-800/50'
-                            }`}
+                            className="relative"
                         >
-                            <Crown className={`w-6 h-6 ${
-                                isDark ? 'text-black' : 'text-white'
-                            }`} />
-                            <div className={`absolute inset-0 rounded-xl blur-lg opacity-50 group-hover:opacity-75 transition-opacity -z-10 ${
-                                isDark 
-                                    ? 'bg-gradient-to-r from-yellow-500 to-yellow-400'
-                                    : 'bg-gradient-to-r from-gray-800 to-gray-700'
-                            }`} />
+                            <img 
+                                src="/pludo_svg_logo.svg" 
+                                alt="PLUDO.AI Logo" 
+                                className="h-10 w-auto"
+                            />
                         </motion.div>
                         <div className="flex flex-col">
                             <span className={`text-lg font-black bg-gradient-to-r bg-clip-text text-transparent tracking-wide ${
@@ -168,15 +159,11 @@ export function GeometricNavbar() {
                     <DialogTitle className="sr-only">Navigation Menu</DialogTitle>
                     <div className="flex items-center justify-between">
                         <Link to="/" className="flex items-center space-x-2">
-                            <div className={`p-2 rounded-xl ${
-                                isDark 
-                                    ? 'bg-gradient-to-r from-yellow-500 to-yellow-400'
-                                    : 'bg-gradient-to-r from-gray-800 to-gray-700'
-                            }`}>
-                                <Crown className={`w-5 h-5 ${
-                                    isDark ? 'text-black' : 'text-white'
-                                }`} />
-                            </div>
+                            <img 
+                                src="/pludo_svg_logo.svg" 
+                                alt="PLUDO.AI Logo" 
+                                className="h-8 w-auto"
+                            />
                             <span className={`text-lg font-bold bg-gradient-to-r bg-clip-text text-transparent ${
                                 isDark 
                                     ? 'from-yellow-400 to-yellow-500'

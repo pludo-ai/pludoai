@@ -57,7 +57,7 @@ interface HeroLandingProps {
 
 const defaultProps: Partial<HeroLandingProps> = {
   logo: {
-    src: "https://images.pexels.com/photos/3184360/pexels-photo-3184360.jpeg?auto=compress&cs=tinysrgb&w=64&h=64&dpr=2",
+    src: "/pludo_svg_logo.svg",
     alt: "PLUDO.AI Logo",
     companyName: "PLUDO.AI"
   },
@@ -119,6 +119,11 @@ export function HeroLanding(props: HeroLandingProps) {
           to={cta.href}
           className="inline-flex items-center justify-center px-8 py-4 text-lg font-bold bg-gradient-to-r from-brand-gold to-brand-light-gold hover:from-brand-light-gold hover:to-brand-gold text-black rounded-xl shadow-lg shadow-brand-gold/30 hover:shadow-brand-gold/50 transition-all duration-300 transform hover:scale-105"
         >
+          <img 
+            src="/pludo_svg_logo.svg" 
+            alt="PLUDO.AI Logo" 
+            className="w-5 h-5 mr-2"
+          />
           {cta.text}
         </Link>
       )
@@ -172,7 +177,16 @@ export function HeroLanding(props: HeroLandingProps) {
           <div className="flex lg:flex-1">
             <Link to="/" className="flex items-center space-x-3 group">
               <div className="relative p-3 bg-gradient-to-r from-brand-gold to-brand-light-gold rounded-2xl shadow-lg shadow-brand-gold/30 group-hover:shadow-brand-gold/50 transition-all duration-300">
-                <Crown className="w-8 h-8 text-black" />
+                <motion.div
+                  whileHover={{ rotate: 360, scale: 1.1 }}
+                  transition={{ duration: 0.6, ease: "easeInOut" }}
+                >
+                  <img 
+                    src="/pludo_svg_logo.svg" 
+                    alt="PLUDO.AI Logo" 
+                    className="w-8 h-8"
+                  />
+                </motion.div>
               </div>
               <div className="flex flex-col">
                 <span className="text-2xl font-black bg-gradient-to-r from-brand-gold via-brand-light-gold to-brand-gold bg-clip-text text-transparent tracking-wide">
@@ -239,7 +253,11 @@ export function HeroLanding(props: HeroLandingProps) {
             <div className="flex items-center justify-between">
               <Link to="/" className="flex items-center space-x-2">
                 <div className="p-2 bg-gradient-to-r from-brand-gold to-brand-light-gold rounded-xl">
-                  <Crown className="w-6 h-6 text-black" />
+                  <img 
+                    src="/pludo_svg_logo.svg" 
+                    alt="PLUDO.AI Logo" 
+                    className="w-6 h-6"
+                  />
                 </div>
                 <span className="text-xl font-bold bg-gradient-to-r from-brand-gold to-brand-light-gold bg-clip-text text-transparent">
                   {logo?.companyName}

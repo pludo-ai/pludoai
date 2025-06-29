@@ -15,8 +15,6 @@ import {
   Globe,
   AlertCircle,
   Trash2,
-  Server,
-  Cloud
 } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
@@ -35,9 +33,6 @@ interface Agent {
   created_at: string;
   updated_at: string;
 }
-
-// Repository token for operations
-const GITHUB_TOKEN = 'ghp_vQZhGJKLMNOPQRSTUVWXYZ1234567890abcdef';
 
 export const Dashboard: React.FC = () => {
   const navigate = useNavigate();
@@ -98,7 +93,7 @@ export const Dashboard: React.FC = () => {
           const response = await fetch(`https://api.github.com/repos/${repoFullName}`, {
             method: 'DELETE',
             headers: {
-              'Authorization': `token ${GITHUB_TOKEN}`,
+              'Authorization': `token ${process.env.GITHUB_TOKEN}`,
               'Accept': 'application/vnd.github.v3+json',
             },
           });
@@ -187,7 +182,11 @@ export const Dashboard: React.FC = () => {
                 </div>
                 <div className="hidden md:block">
                   <div className="w-16 h-16 bg-gradient-to-r from-gray-800 to-gray-700 dark:from-yellow-500 dark:to-yellow-400 rounded-full flex items-center justify-center">
-                    <Bot className="w-8 h-8 text-white dark:text-black" />
+                    <img 
+                      src="/pludo_svg_logo.svg" 
+                      alt="PLUDO.AI Logo" 
+                      className="w-8 h-8"
+                    />
                   </div>
                 </div>
               </div>
@@ -251,7 +250,11 @@ export const Dashboard: React.FC = () => {
                 </div>
               ) : agents.length === 0 ? (
                 <div className="text-center py-8">
-                  <Bot className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                  <img 
+                    src="/pludo_svg_logo.svg" 
+                    alt="PLUDO.AI Logo" 
+                    className="w-12 h-12 mx-auto mb-4 opacity-50"
+                  />
                   <p className="text-gray-500 dark:text-gray-400 mb-4">No agents created yet</p>
                   <Button onClick={handleCreateAgent} className="bg-gradient-to-r from-gray-800 to-gray-700 dark:from-yellow-500 dark:to-yellow-400 hover:from-gray-700 hover:to-gray-600 dark:hover:from-yellow-400 dark:hover:to-yellow-300 text-white dark:text-black font-bold">
                     Create Your First Agent
@@ -271,7 +274,11 @@ export const Dashboard: React.FC = () => {
                       >
                         <div className="flex items-center space-x-4">
                           <div className="w-12 h-12 bg-gradient-to-r from-gray-800 to-gray-700 dark:from-yellow-500 dark:to-yellow-400 rounded-full flex items-center justify-center">
-                            <Bot className="w-6 h-6 text-white dark:text-black" />
+                            <img 
+                              src="/pludo_svg_logo.svg" 
+                              alt="PLUDO.AI Logo" 
+                              className="w-6 h-6"
+                            />
                           </div>
                           <div>
                             <div className="font-medium text-gray-900 dark:text-white">
@@ -298,22 +305,12 @@ export const Dashboard: React.FC = () => {
                               <Eye className="w-4 h-4 mr-1" />
                               Preview
                             </Button>
-                          ) : agent.vercel_url && !isPublicHostedUrl(agent.vercel_url) ? (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handlePreview(agent.vercel_url!)}
-                              className="flex items-center text-yellow-600 dark:text-yellow-400 border-yellow-300 dark:border-yellow-500/30"
-                            >
-                              <AlertCircle className="w-4 h-4 mr-1" />
-                              Check Status
-                            </Button>
                           ) : null}
 
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={handleCreateAgent}
+                            onClick={() => navigate('/create')}
                             className="flex items-center"
                           >
                             <Edit className="w-4 h-4 mr-1" />

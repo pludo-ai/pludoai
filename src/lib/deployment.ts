@@ -383,7 +383,7 @@ export async function deployToVercel(agentId: string): Promise<DeploymentResult>
         agentId,
         githubRepo: agent.github_repo,
         vercelUrl: dashboardUrl,
-        error: `Project created successfully but deployment is pending. You can trigger it manually or wait for automatic deployment.`,
+        error: `Project created successfully but deployment is pending.`,
       };
     }
 

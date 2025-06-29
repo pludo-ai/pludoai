@@ -33,10 +33,25 @@ import { useAuthStore } from '../store/authStore';
 import { generateAgentCode, uploadToGitHub, deployToVercel, triggerDeploymentWithFile } from '../lib/deployment';
 import toast from 'react-hot-toast';
 
-interface FAQ {
-  id: string;
-  question: string;
-  answer: string;
+interface Agent {
+  name: string;
+  brandName: string;
+  websiteName: string;
+  agentType: string;
+  roleDescription: string;
+  services: string[];
+  faqs: { question: string; answer: string }[];
+  primaryColor: string;
+  tone: string;
+  avatarUrl: string;
+  officeHours: string;
+  knowledge: string;
+  subdomain: string;
+  // New API configuration fields
+  apiProvider: string;
+  apiKey: string;
+  model: string;
+  customModel: string;
 }
 
 interface DeploymentStep {
@@ -46,41 +61,21 @@ interface DeploymentStep {
   message?: string;
 }
 
-// Utility function to generate random string
-const generateRandomString = (length: number = 8): string => {
-  const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
-  let result = '';
-  for (let i = 0; i < length; i++) {
-    result += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  return result;
-};
-
-// Utility function to generate subdomain
-const generateSubdomain = (brandName: string): string => {
-  const cleanBrand = brandName
-    .toLowerCase()
-    .replace(/[^a-z0-9]/g, '')
-    .substring(0, 15); // Limit brand part to 15 chars
-  
-  const randomSuffix = generateRandomString(6);
-  const timestamp = Date.now().toString().slice(-4);
-  
-  return `${cleanBrand || 'agent'}-${randomSuffix}-${timestamp}`;
-};
-
 export const Create: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuthStore();
   
   // Form state
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<Agent>({
     name: '',
     brandName: '',
     websiteName: '',
     agentType: 'customer-support',
     roleDescription: '',
     services: [''],
+    faqs: [
+      { id: `faq-${Math.random().toString(36).substr(2, 8)}`, question: '', answer: '' }
+    ],
     primaryColor: '#eab308', // yellow-500
     tone: 'professional',
     avatarUrl: '',
@@ -93,10 +88,6 @@ export const Create: React.FC = () => {
     model: 'deepseek/deepseek-r1',
     customModel: ''
   });
-
-  const [faqs, setFaqs] = useState<FAQ[]>([
-    { id: `faq-${generateRandomString(8)}`, question: '', answer: '' }
-  ]);
 
   // Deployment state
   const [deploymentSteps, setDeploymentSteps] = useState<DeploymentStep[]>([
@@ -145,7 +136,7 @@ export const Create: React.FC = () => {
     }
   ];
 
-  // Auto-generate subdomain from brand name with random suffix
+  // Auto-generate subdomain from brand name
   useEffect(() => {
     if (formData.brandName) {
       const newSubdomain = generateSubdomain(formData.brandName);
@@ -168,7 +159,10 @@ export const Create: React.FC = () => {
   const handleServiceChange = (index: number, value: string) => {
     const newServices = [...formData.services];
     newServices[index] = value;
-    setFormData(prev => ({ ...prev, services: newServices }));
+    setFormData(prev => ({ 
+      ...prev, 
+      services: newServices 
+    }));
   };
 
   const addService = () => {
@@ -186,19 +180,28 @@ export const Create: React.FC = () => {
   };
 
   const handleFaqChange = (id: string, field: 'question' | 'answer', value: string) => {
-    setFaqs(prev => prev.map(faq => 
-      faq.id === id ? { ...faq, [field]: value } : faq
-    ));
+    setFormData(prev => ({
+      ...prev,
+      faqs: prev.faqs.map(faq => 
+        faq.id === id ? { ...faq, [field]: value } : faq
+      )
+    }));
   };
 
   const addFaq = () => {
-    const newId = `faq-${generateRandomString(8)}`;
-    setFaqs(prev => [...prev, { id: newId, question: '', answer: '' }]);
+    const newId = `faq-${Math.random().toString(36).substr(2, 8)}`;
+    setFormData(prev => ({
+      ...prev,
+      faqs: [...prev.faqs, { id: newId, question: '', answer: '' }]
+    }));
   };
 
   const removeFaq = (id: string) => {
-    if (faqs.length > 1) {
-      setFaqs(prev => prev.filter(faq => faq.id !== id));
+    if (formData.faqs.length > 1) {
+      setFormData(prev => ({
+        ...prev,
+        faqs: prev.faqs.filter(faq => faq.id !== id)
+      }));
     }
   };
 
@@ -274,7 +277,7 @@ export const Create: React.FC = () => {
         subdomain: finalSubdomain,
         model: finalModel,
         services: formData.services.filter(s => s.trim()),
-        faqs: faqs.filter(faq => faq.question.trim() && faq.answer.trim()),
+        faqs: formData.faqs.filter(faq => faq.question.trim() && faq.answer.trim()),
         userId: user.id,
       };
 
@@ -347,9 +350,29 @@ export const Create: React.FC = () => {
         updateDeploymentStep('step-3', 'success', 'Deployed to cloud successfully');
         setDeploymentResult(prev => ({ ...prev, ...result }));
         toast.success('Agent deployed successfully!');
+        
+        // If deployment is pending, show trigger button after 45 seconds
+        if (!result.vercelUrl || !isPublicHostedUrl(result.vercelUrl)) {
+          setTimeout(() => {
+            setButtonStates(prev => ({ ...prev, makeItLive: true }));
+            toast.error('Auto deploy having trouble, trigger it manually', {
+              icon: '🚀',
+              duration: 5000
+            });
+          }, 45000);
+        }
       } else {
         updateDeploymentStep('step-3', 'error', result.error);
-        toast.error(result.error || 'Failed to deploy to cloud');
+        toast.error('Failed to deploy to cloud');
+        
+        // Show trigger button if deployment is pending
+        if (result.vercelUrl && !isPublicHostedUrl(result.vercelUrl)) {
+          setButtonStates(prev => ({ ...prev, makeItLive: true }));
+          toast.error('Auto deploy having trouble, trigger it manually', {
+            icon: '🚀',
+            duration: 5000
+          });
+        }
       }
     } catch (error: any) {
       updateDeploymentStep('step-3', 'error', error.message);
@@ -417,6 +440,15 @@ export const Create: React.FC = () => {
     return provider ? provider.models : [];
   };
 
+  // Helper function to generate a unique subdomain
+  const generateSubdomain = (brandName: string): string => {
+    const cleanBrandName = brandName.toLowerCase().replace(/[^a-z0-9]/g, '-').substring(0, 20);
+    const userSuffix = user?.id.slice(-4) || Math.random().toString(36).substr(2, 4);
+    const randomSuffix = Math.random().toString(36).substr(2, 4);
+    const timestamp = Date.now().toString().slice(-6);
+    return `${cleanBrandName}-ai-agent-${userSuffix}-${randomSuffix}-${timestamp}`;
+  };
+
   // Check if buttons should be disabled
   const isGenerateCodeDisabled = buttonStates.generateCode || isDeploying;
   const isUploadRepoDisabled = buttonStates.uploadRepo || isDeploying || deploymentSteps[0]?.status !== 'success';
@@ -427,7 +459,11 @@ export const Create: React.FC = () => {
     return (
       <div className="min-h-screen flex items-center justify-center bg-white dark:bg-[#0A0A0A] pt-16 transition-colors duration-300">
         <div className="bg-gradient-to-br from-gray-50 via-white to-gray-100 dark:from-[#1A1A1A] dark:via-[#0A0A0A] dark:to-black border border-gray-300/50 dark:border-yellow-500/30 rounded-2xl shadow-2xl shadow-gray-400/20 dark:shadow-yellow-500/20 p-8 text-center transition-all duration-300">
-          <Bot className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+          <img 
+            src="/pludo_svg_logo.svg" 
+            alt="PLUDO.AI Logo" 
+            className="w-12 h-12 mx-auto mb-4 opacity-70"
+          />
           <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
             Sign In Required
           </h2>
@@ -477,7 +513,11 @@ export const Create: React.FC = () => {
               <div className="bg-gradient-to-br from-gray-50 via-white to-gray-100 dark:from-[#1A1A1A] dark:via-[#0A0A0A] dark:to-black border border-gray-300/50 dark:border-yellow-500/30 rounded-2xl shadow-2xl shadow-gray-400/20 dark:shadow-yellow-500/20 p-8 transition-all duration-300">
                 <div className="flex items-center space-x-3 mb-6">
                   <div className="p-2 bg-yellow-100 dark:bg-yellow-500/20 rounded-lg">
-                    <Bot className="w-6 h-6 text-yellow-600 dark:text-yellow-400" />
+                    <img 
+                      src="/pludo_svg_logo.svg" 
+                      alt="PLUDO.AI Logo" 
+                      className="w-6 h-6"
+                    />
                   </div>
                   <h2 className="text-2xl font-semibold text-gray-900 dark:text-white">
                     Basic Information
@@ -704,7 +744,7 @@ export const Create: React.FC = () => {
 
                 <div className="space-y-4">
                   {formData.services.map((service, index) => (
-                    <div key={`service-${index}-${generateRandomString(4)}`} className="flex items-center space-x-3">
+                    <div key={`service-${index}-${Math.random().toString(36).substr(2, 4)}`} className="flex items-center space-x-3">
                       <Input
                         value={service}
                         onChange={(e) => handleServiceChange(index, e.target.value)}
@@ -753,13 +793,13 @@ export const Create: React.FC = () => {
                 </div>
 
                 <div className="space-y-6">
-                  {faqs.map((faq) => (
+                  {formData.faqs.map((faq, index) => (
                     <div key={faq.id} className="border border-gray-200 dark:border-gray-700 rounded-lg p-4">
                       <div className="flex items-start justify-between mb-4">
                         <h3 className="font-medium text-gray-900 dark:text-white">
-                          FAQ #{faqs.findIndex(f => f.id === faq.id) + 1}
+                          FAQ #{index + 1}
                         </h3>
-                        {faqs.length > 1 && (
+                        {formData.faqs.length > 1 && (
                           <Button
                             variant="ghost"
                             size="sm"
@@ -911,7 +951,11 @@ export const Create: React.FC = () => {
                           className="w-10 h-10 rounded-full flex items-center justify-center text-white"
                           style={{ backgroundColor: formData.primaryColor }}
                         >
-                          <Bot className="w-6 h-6" />
+                          <img 
+                            src="/pludo_svg_logo.svg" 
+                            alt="PLUDO.AI Logo" 
+                            className="w-6 h-6"
+                          />
                         </div>
                       )}
                       <div>

@@ -99,15 +99,17 @@ function GeometricNavbar() {
             <nav aria-label="Global" className="flex items-center justify-between p-4 lg:px-8 h-16">
                 <div className="flex lg:flex-1">
                     <Link to="/" className="flex items-center space-x-2 group">
-                        <div className={`relative p-2 rounded-xl shadow-lg transition-all duration-300 ${
-                            isDark 
-                                ? 'bg-gradient-to-r from-yellow-500 to-yellow-400 shadow-yellow-500/30 group-hover:shadow-yellow-500/50'
-                                : 'bg-gradient-to-r from-gray-800 to-gray-700 shadow-gray-800/30 group-hover:shadow-gray-800/50'
-                        }`}>
-                            <Crown className={`w-6 h-6 ${
-                                isDark ? 'text-black' : 'text-white'
-                            }`} />
-                        </div>
+                        <motion.div
+                            whileHover={{ rotate: 360, scale: 1.1 }}
+                            transition={{ duration: 0.6, ease: "easeInOut" }}
+                            className="relative"
+                        >
+                            <img 
+                                src="/pludo_svg_logo.svg" 
+                                alt="PLUDO.AI Logo" 
+                                className="w-10 h-10"
+                            />
+                        </motion.div>
                         <div className="flex flex-col">
                             <span className={`text-lg font-black bg-gradient-to-r bg-clip-text text-transparent tracking-wide ${
                                 isDark 
@@ -201,15 +203,11 @@ function GeometricNavbar() {
                 }`}>
                     <div className="flex items-center justify-between">
                         <Link to="/" className="flex items-center space-x-2">
-                            <div className={`p-2 rounded-xl ${
-                                isDark 
-                                    ? 'bg-gradient-to-r from-yellow-500 to-yellow-400'
-                                    : 'bg-gradient-to-r from-gray-800 to-gray-700'
-                            }`}>
-                                <Crown className={`w-5 h-5 ${
-                                    isDark ? 'text-black' : 'text-white'
-                                }`} />
-                            </div>
+                            <img 
+                                src="/pludo_svg_logo.svg" 
+                                alt="PLUDO.AI Logo" 
+                                className="h-8 w-auto"
+                            />
                             <span className={`text-lg font-bold bg-gradient-to-r bg-clip-text text-transparent ${
                                 isDark 
                                     ? 'from-yellow-400 to-yellow-500'
@@ -328,7 +326,7 @@ function GeometricNavbar() {
     );
 }
 
-function HeroGeometric({
+export function HeroGeometric({
     badge = "AI Excellence",
     title1 = "Craft Extraordinary",
     title2 = "AI Agents",
@@ -428,9 +426,11 @@ function HeroGeometric({
                                     : 'bg-gray-900/[0.03] border-gray-800/[0.2]'
                             }`}
                         >
-                            <Crown className={`h-3 w-3 ${
-                                isDark ? 'text-yellow-500' : 'text-gray-800'
-                            }`} />
+                            <img 
+                                src="/pludo_svg_logo.svg" 
+                                alt="PLUDO.AI Logo" 
+                                className="h-3 w-3"
+                            />
                             <span className={`text-xs tracking-wide font-medium ${
                                 isDark ? 'text-white/70' : 'text-gray-700'
                             }`}>
@@ -500,7 +500,11 @@ function HeroGeometric({
                                         : 'bg-gradient-to-r from-gray-800 to-gray-700 hover:from-gray-700 hover:to-gray-600 text-white shadow-gray-800/30 hover:shadow-gray-800/50 border-gray-800/50'
                                 }`}
                             >
-                                <Crown className="w-5 h-5 mr-2" />
+                                <img 
+                                    src="/pludo_svg_logo.svg" 
+                                    alt="PLUDO.AI Logo" 
+                                    className="w-5 h-5 mr-2"
+                                />
                                 Begin Your Journey
                             </motion.a>
                             
