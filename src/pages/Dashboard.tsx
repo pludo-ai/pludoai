@@ -42,7 +42,7 @@ interface Agent {
 
 export const Dashboard: React.FC = () => {
   const navigate = useNavigate();
-  const { user, setUser } = useAuthStore();
+  const { user, logout, isAuthenticated } = useAuthStore();
   const [activeTab, setActiveTab] = useState('overview');
   const [agents, setAgents] = useState<Agent[]>([]);
   const [loading, setLoading] = useState(true);
@@ -58,8 +58,17 @@ export const Dashboard: React.FC = () => {
     { id: 'embed', label: 'Embed Code', icon: <Code className="w-4 h-4" /> },
   ];
 
+  // Redirect if not authenticated
   useEffect(() => {
-    fetchAgents();
+    if (!isAuthenticated) {
+      navigate('/login');
+    }
+  }, [isAuthenticated, navigate]);
+
+  useEffect(() => {
+    if (user) {
+      fetchAgents();
+    }
   }, [user]);
 
   useEffect(() => {
@@ -175,8 +184,11 @@ export const Dashboard: React.FC = () => {
   const handleLogout = async () => {
     try {
       await supabase.auth.signOut();
-      setUser(null);
+      logout(); // Clear local storage
+      toast.success('Signed out successfully');
+      navigate('/');
     } catch (error: any) {
+      console.error('Logout error:', error);
       toast.error('Failed to logout: ' + error.message);
     }
   };
@@ -600,6 +612,15 @@ export const Dashboard: React.FC = () => {
         return null;
     }
   };
+
+  // Show loading state while checking authentication
+  if (!user && isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-white dark:bg-[#0A0A0A] pt-16 transition-colors duration-300 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-yellow-500"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-white dark:bg-[#0A0A0A] pt-16 transition-colors duration-300">
