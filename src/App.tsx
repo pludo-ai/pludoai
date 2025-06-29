@@ -16,7 +16,7 @@ import { supabase, isSupabaseConfigured } from './lib/supabase';
 
 function App() {
   const { isDark } = useThemeStore();
-  const { user, setUser, setLoading, isAuthenticated } = useAuthStore();
+  const { setUser, setLoading } = useAuthStore();
 
   useEffect(() => {
     // Apply theme to document
@@ -35,66 +35,32 @@ function App() {
       return;
     }
 
-    // Initialize authentication state
-    initializeAuth();
+    // Get initial session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null);
+      setLoading(false);
+      
+      // Ensure user exists in background (non-blocking)
+      if (session?.user) {
+        ensureUserExists(session.user);
+      }
+    });
 
     // Listen for auth changes
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log('Auth state changed:', event, session?.user?.id);
-      
-      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
-        if (session?.user) {
-          setUser(session.user);
-          await ensureUserExists(session.user);
-        }
-      } else if (event === 'SIGNED_OUT') {
-        setUser(null);
-      }
-      
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
       setLoading(false);
+      
+      // Ensure user exists in background (non-blocking)
+      if (session?.user) {
+        ensureUserExists(session.user);
+      }
     });
 
     return () => subscription.unsubscribe();
   }, [setUser, setLoading]);
-
-  const initializeAuth = async () => {
-    try {
-      // Check if we have a stored session
-      const { data: { session }, error } = await supabase.auth.getSession();
-      
-      if (error) {
-        console.error('Error getting session:', error);
-        setUser(null);
-        setLoading(false);
-        return;
-      }
-
-      if (session?.user) {
-        // Verify the session is still valid by making a test request
-        const { error: userError } = await supabase.auth.getUser();
-        
-        if (userError) {
-          console.error('Session invalid:', userError);
-          // Clear invalid session
-          await supabase.auth.signOut();
-          setUser(null);
-        } else {
-          // Session is valid, set user and ensure user record exists
-          setUser(session.user);
-          await ensureUserExists(session.user);
-        }
-      } else {
-        setUser(null);
-      }
-    } catch (error) {
-      console.error('Error initializing auth:', error);
-      setUser(null);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const ensureUserExists = async (user: any) => {
     if (!isSupabaseConfigured()) return;
@@ -124,8 +90,6 @@ function App() {
 
         if (insertError) {
           console.error('Error creating user record:', insertError);
-        } else {
-          console.log('User record created successfully');
         }
       }
     } catch (error) {

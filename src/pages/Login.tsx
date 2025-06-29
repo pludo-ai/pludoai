@@ -1,31 +1,21 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Mail, Lock, Eye, EyeOff, Bot, AlertCircle } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Card } from '../components/ui/Card';
-import { useAuthStore } from '../store/authStore';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import toast from 'react-hot-toast';
 
 export const Login: React.FC = () => {
   const navigate = useNavigate();
-  const { isAuthenticated, setLoading } = useAuthStore();
   const [formData, setFormData] = useState({
     email: '',
     password: '',
-    rememberMe: true,
   });
   const [showPassword, setShowPassword] = useState(false);
-  const [loading, setLocalLoading] = useState(false);
-
-  // Redirect if already authenticated
-  useEffect(() => {
-    if (isAuthenticated) {
-      navigate('/dashboard');
-    }
-  }, [isAuthenticated, navigate]);
+  const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -35,7 +25,6 @@ export const Login: React.FC = () => {
       return;
     }
 
-    setLocalLoading(true);
     setLoading(true);
 
     try {
@@ -46,41 +35,19 @@ export const Login: React.FC = () => {
 
       if (error) throw error;
 
-      // The auth state will be automatically updated via the auth listener in App.tsx
       toast.success('Welcome back!');
-      
-      // Small delay to ensure state is updated before navigation
-      setTimeout(() => {
-        navigate('/dashboard');
-      }, 100);
-      
+      navigate('/dashboard');
     } catch (error: any) {
-      console.error('Login error:', error);
-      
-      // Provide more specific error messages
-      let errorMessage = 'Login failed';
-      if (error.message.includes('Invalid login credentials')) {
-        errorMessage = 'Invalid email or password. Please check your credentials and try again.';
-      } else if (error.message.includes('Email not confirmed')) {
-        errorMessage = 'Please check your email and click the verification link before signing in.';
-      } else if (error.message.includes('Too many requests')) {
-        errorMessage = 'Too many login attempts. Please wait a moment before trying again.';
-      } else if (error.message) {
-        errorMessage = error.message;
-      }
-      
-      toast.error(errorMessage);
+      toast.error(error.message || 'Login failed');
     } finally {
-      setLocalLoading(false);
       setLoading(false);
     }
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value, type, checked } = e.target;
     setFormData(prev => ({
       ...prev,
-      [name]: type === 'checkbox' ? checked : value
+      [e.target.name]: e.target.value
     }));
   };
 
@@ -99,14 +66,9 @@ export const Login: React.FC = () => {
               <div className="p-2 bg-gradient-to-r from-gray-800 to-gray-700 dark:from-yellow-500 dark:to-yellow-400 rounded-xl">
                 <Bot className="w-6 h-6 text-white dark:text-black" />
               </div>
-              <div className="flex items-center space-x-2">
-                <span className="text-xl font-bold bg-gradient-to-r from-gray-800 to-gray-700 dark:from-yellow-400 dark:to-yellow-500 bg-clip-text text-transparent">
-                  PLUDO.AI
-                </span>
-                <span className="px-1.5 py-0.5 text-xs font-bold bg-gradient-to-r from-yellow-500 to-yellow-400 text-black rounded-full">
-                  BETA
-                </span>
-              </div>
+              <span className="text-xl font-bold bg-gradient-to-r from-gray-800 to-gray-700 dark:from-yellow-400 dark:to-yellow-500 bg-clip-text text-transparent">
+                PLUDO.AI
+              </span>
             </div>
             <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
               Welcome Back
@@ -168,14 +130,11 @@ export const Login: React.FC = () => {
               <label className="flex items-center">
                 <input
                   type="checkbox"
-                  name="rememberMe"
-                  checked={formData.rememberMe}
-                  onChange={handleChange}
                   className="w-4 h-4 text-yellow-500 bg-gray-100 dark:bg-gray-800 border-gray-300 dark:border-gray-600 rounded focus:ring-yellow-500 focus:ring-2"
                   disabled={!isSupabaseConfigured()}
                 />
                 <span className="ml-2 text-sm text-gray-600 dark:text-gray-400">
-                  Keep me signed in
+                  Remember me
                 </span>
               </label>
               <Link
@@ -194,7 +153,7 @@ export const Login: React.FC = () => {
                   : 'bg-gray-400 dark:bg-gray-600 text-gray-600 dark:text-gray-400 cursor-not-allowed'
               }`}
               loading={loading}
-              disabled={!isSupabaseConfigured() || loading}
+              disabled={!isSupabaseConfigured()}
             >
               {isSupabaseConfigured() ? 'Sign In' : 'Database Not Configured'}
             </Button>
@@ -212,15 +171,6 @@ export const Login: React.FC = () => {
               </Link>
             </p>
           </div>
-
-          {/* Persistent Login Info */}
-          {isSupabaseConfigured() && (
-            <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-500/10 rounded-lg">
-              <div className="text-xs text-blue-800 dark:text-blue-200">
-                <strong>Secure Login:</strong> Your session will be securely stored and you'll stay signed in across browser sessions.
-              </div>
-            </div>
-          )}
         </div>
       </motion.div>
     </div>
