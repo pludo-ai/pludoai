@@ -67,6 +67,7 @@ import {
 } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
+import { HeroLanding } from '../components/ui/hero-1';
 
 // Register GSAP plugins
 gsap.registerPlugin(ScrollTrigger, TextPlugin);
@@ -446,21 +447,6 @@ export const Landing: React.FC = () => {
 
   useEffect(() => {
     const ctx = gsap.context(() => {
-      // Luxury hero animations
-      const heroTl = gsap.timeline({ defaults: { ease: 'power4.out', duration: 1.5 } });
-      
-      heroTl
-        .from('.hero-badge', { opacity: 0, scale: 0.5, y: 30, delay: 0.5 })
-        .from('.hero-title .char', { 
-            y: 100, 
-            opacity: 0, 
-            stagger: 0.02, 
-            ease: 'power4.out' 
-        }, "-=1.2")
-        .from('.hero-subtitle', { opacity: 0, y: 50 }, "-=1")
-        .from('.hero-buttons', { opacity: 0, y: 30, scale: 0.95 }, "-=0.8")
-        .from('.hero-stats', { opacity: 0, y: 30, stagger: 0.1 }, "-=0.6");
-
       // Advanced scroll-triggered animations
       gsap.utils.toArray('.fade-in-up').forEach((elem: any) => {
         gsap.from(elem, {
@@ -630,87 +616,28 @@ export const Landing: React.FC = () => {
     <div className="min-h-screen overflow-x-hidden bg-brand-dark text-white font-display" ref={containerRef}>
       <LuxuryParticles />
       
-      {/* Cinematic Hero Section */}
-      <section className="relative min-h-screen flex items-center justify-center overflow-hidden perspective-2000">
-        <div className="absolute inset-0 bg-gradient-to-b from-brand-dark via-brand-dark-gray to-black" />
-        <div className="absolute inset-0 bg-[url('/grid.svg')] opacity-50" />
-        
-        <div className="absolute top-20 left-20 w-40 h-40 bg-gradient-to-r from-brand-gold/20 to-brand-silver/20 rounded-full blur-3xl animate-scale-pulse" />
-        <div className="absolute bottom-20 right-20 w-48 h-48 bg-gradient-to-r from-brand-silver/20 to-brand-platinum/20 rounded-full blur-3xl animate-scale-pulse" style={{ animationDelay: '2s' }} />
-        <div className="absolute top-1/2 left-10 w-32 h-32 bg-gradient-to-r from-brand-dark-gold/30 to-brand-gold/30 rounded-full blur-2xl animate-float" />
-        
-        <div className="relative z-10 text-center max-w-8xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="hero-badge inline-flex items-center space-x-4 bg-brand-dark/50 backdrop-blur-xl px-8 py-4 rounded-full border border-brand-gold/30 mb-12 shadow-2xl shadow-brand-gold/20">
-            <Crown className="w-6 h-6 text-brand-gold animate-subtle-pulse" />
-            <span className="text-brand-light-gold font-bold tracking-widest uppercase text-sm">The Pinnacle of AI Excellence</span>
-            <Diamond className="w-6 h-6 text-brand-silver animate-subtle-pulse" style={{ animationDelay: '0.5s' }} />
-          </div>
-          
-          <div className="mb-12">
-            <h1 className="hero-title text-6xl md:text-8xl lg:text-9xl font-black uppercase tracking-tighter leading-none">
-                {"Craft Extraordinary AI Agents".split("").map((char, index) => <span key={index} className="char inline-block">{char === " " ? "\u00A0" : char}</span>)}
-            </h1>
-          </div>
+      {/* New Hero Section */}
+      <HeroLanding
+        title="Craft Extraordinary AI Agents"
+        description="Where artificial intelligence meets uncompromising luxury. Create, deploy, and scale sophisticated AI agents that redefine customer excellence."
+        announcementBanner={{
+          text: "🎉 The Pinnacle of AI Excellence",
+          linkText: "Experience Demo",
+          linkHref: "#demo"
+        }}
+        callToActions={[
+          { text: "Begin Your Journey", href: "/signup", variant: "primary" },
+          { text: "Watch Demo", href: "#demo", variant: "secondary" }
+        ]}
+        titleSize="large"
+        gradientColors={{
+          from: "#D4AF37",
+          to: "#C0C0C0"
+        }}
+      />
 
-          <p className="hero-subtitle text-2xl md:text-3xl text-gray-200 max-w-5xl mx-auto font-light leading-relaxed mb-16 tracking-wide">
-            Where artificial intelligence meets uncompromising luxury. Create, deploy, and scale 
-            <span className="text-brand-gold font-medium"> sophisticated AI agents </span>
-             that redefine customer excellence.
-          </p>
-          
-          <div className="hero-buttons flex flex-col sm:flex-row items-center justify-center gap-8 mb-20">
-            <Link to="/signup">
-              <Button size="lg" className="px-16 py-8 text-2xl bg-gradient-to-r from-brand-gold to-brand-light-gold hover:from-brand-light-gold hover:to-brand-gold text-black font-black shadow-2xl shadow-brand-gold/40 transform hover:scale-105 transition-all duration-300 border-2 border-brand-gold rounded-2xl">
-                Begin Your Journey
-                <ArrowRight className="w-8 h-8 ml-4" />
-              </Button>
-            </Link>
-            <button 
-              onClick={() => document.querySelector('.video-section')?.scrollIntoView({ behavior: 'smooth' })}
-              className="flex items-center text-2xl text-gray-200 hover:text-brand-gold transition-all duration-300 group"
-            >
-              <span className="mr-6 font-light tracking-wide">Experience Excellence</span>
-              <div className="w-20 h-20 rounded-full border-2 border-brand-silver group-hover:border-brand-gold transition-all duration-300 flex items-center justify-center backdrop-blur-sm bg-white/5 group-hover:bg-brand-gold/10 shadow-xl">
-                <Play className="w-8 h-8 ml-1" />
-              </div>
-            </button>
-          </div>
-
-          <div className="hero-stats grid grid-cols-2 md:grid-cols-4 gap-12 max-w-6xl mx-auto">
-            {[
-              { number: 100, suffix: "K+", label: "Elite Agents Deployed", color: "text-brand-gold" },
-              { number: 99.99, suffix: "%", label: "Guaranteed Uptime", color: "text-brand-silver" },
-              { number: 5, suffix: "M+", label: "Daily Interactions", color: "text-brand-platinum" },
-              { number: 195, suffix: "", label: "Countries with Presence", color: "text-brand-light-gold" }
-            ].map((stat, index) => (
-              <div key={index} className="text-center group">
-                <div className={`text-4xl md:text-5xl font-black mb-2 ${stat.color} group-hover:scale-110 transition-transform duration-300`}>
-                  <span className="stat-number">{stat.number}</span>
-                  <span>{stat.suffix}</span>
-                </div>
-                <div className="text-gray-300 text-sm font-medium tracking-widest uppercase">{stat.label}</div>
-                <div className="w-full h-0.5 bg-gradient-to-r from-transparent via-brand-gold to-transparent mt-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div className="absolute bottom-12 left-1/2 -translate-x-1/2 flex flex-col items-center space-y-4 animate-bounce">
-          <span className="text-brand-light-gold text-xs uppercase tracking-widest font-medium">Discover Excellence</span>
-          <div className="w-6 h-10 border-2 border-brand-gold rounded-full flex justify-center">
-            <div className="w-1 h-3 bg-brand-gold rounded-full mt-2 animate-pulse-slow" />
-          </div>
-        </div>
-      </section>
-
-      {/* Other sections would follow, with similar enhancements... */}
-            
-            {/* ... [Rest of the JSX code from the user's prompt] ... */}
-            {/* The provided JSX for other sections is largely well-structured. The GSAP enhancements in the useEffect hook will elevate their appearance on scroll. The following is the remainder of the JSX provided in the prompt, with minor class and copy adjustments for consistency. */}
-
-
-     {/* Premium Demo Section */}
-     <section className="py-40 bg-gradient-to-b from-brand-dark to-black relative overflow-hidden">
+      {/* Premium Demo Section */}
+      <section className="py-40 bg-gradient-to-b from-brand-dark to-black relative overflow-hidden">
         <div className="parallax-bg absolute inset-0 bg-gradient-to-r from-brand-gold/5 via-transparent to-brand-silver/5" />
         
         <div className="max-w-8xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
