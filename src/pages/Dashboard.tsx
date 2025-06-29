@@ -20,7 +20,8 @@ import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { useAuthStore } from '../store/authStore';
 import { supabase } from '../lib/supabase';
-import { isPublicHostedUrl } from '../utils/url';
+import { isPludoOnlineDomain } from '../utils/url';
+import { constructPludoUrl } from '../lib/subdomain';
 import toast from 'react-hot-toast';
 
 interface Agent {
@@ -28,6 +29,7 @@ interface Agent {
   name: string;
   brand_name: string;
   agent_type: string;
+  subdomain: string;
   github_repo?: string;
   vercel_url?: string;
   created_at: string;
@@ -74,6 +76,10 @@ export const Dashboard: React.FC = () => {
 
   const handleCreateAgent = () => {
     navigate('/create');
+  };
+
+  const handleEditAgent = (agentId: string) => {
+    navigate(`/create?edit=${agentId}`);
   };
 
   const handleDeleteAgent = async (agent: Agent) => {
@@ -155,13 +161,26 @@ export const Dashboard: React.FC = () => {
   };
 
   const getAgentStatus = (agent: Agent) => {
-    if (agent.vercel_url && isPublicHostedUrl(agent.vercel_url)) {
+    // Check if agent has a pludo.online URL or a working Vercel URL
+    if (agent.vercel_url && (isPludoOnlineDomain(agent.vercel_url) || agent.vercel_url.includes('.vercel.app'))) {
       return { status: 'live', color: 'bg-green-100 dark:bg-green-500/20 text-green-800 dark:text-green-400 border-green-200 dark:border-green-500/30' };
     } else if (agent.github_repo) {
       return { status: 'deploying', color: 'bg-yellow-100 dark:bg-yellow-500/20 text-yellow-800 dark:text-yellow-400 border-yellow-200 dark:border-yellow-500/30' };
     } else {
       return { status: 'pending', color: 'bg-gray-100 dark:bg-gray-500/20 text-gray-800 dark:text-gray-400 border-gray-200 dark:border-gray-500/30' };
     }
+  };
+
+  const getAgentUrl = (agent: Agent) => {
+    // Prefer pludo.online URL, fallback to vercel URL
+    if (agent.vercel_url && isPludoOnlineDomain(agent.vercel_url)) {
+      return agent.vercel_url;
+    } else if (agent.subdomain) {
+      return constructPludoUrl(agent.subdomain);
+    } else if (agent.vercel_url) {
+      return agent.vercel_url;
+    }
+    return null;
   };
 
   const renderTabContent = () => {
@@ -204,7 +223,7 @@ export const Dashboard: React.FC = () => {
               </div>
               <div className="bg-gradient-to-br from-gray-50 via-white to-gray-100 dark:from-[#1A1A1A] dark:via-[#0A0A0A] dark:to-black border border-gray-300/50 dark:border-yellow-500/30 rounded-2xl shadow-2xl shadow-gray-400/20 dark:shadow-yellow-500/20 p-4 transition-all duration-300">
                 <div className="text-2xl font-bold text-green-600 dark:text-green-400">
-                  {agents.filter(a => a.vercel_url && isPublicHostedUrl(a.vercel_url)).length}
+                  {agents.filter(a => getAgentStatus(a).status === 'live').length}
                 </div>
                 <div className="text-sm text-gray-600 dark:text-gray-400">
                   Live Agents
@@ -212,7 +231,7 @@ export const Dashboard: React.FC = () => {
               </div>
               <div className="bg-gradient-to-br from-gray-50 via-white to-gray-100 dark:from-[#1A1A1A] dark:via-[#0A0A0A] dark:to-black border border-gray-300/50 dark:border-yellow-500/30 rounded-2xl shadow-2xl shadow-gray-400/20 dark:shadow-yellow-500/20 p-4 transition-all duration-300">
                 <div className="text-2xl font-bold text-yellow-600 dark:text-yellow-400">
-                  {agents.filter(a => a.github_repo && (!a.vercel_url || !isPublicHostedUrl(a.vercel_url))).length}
+                  {agents.filter(a => getAgentStatus(a).status === 'deploying').length}
                 </div>
                 <div className="text-sm text-gray-600 dark:text-gray-400">
                   Deploying
@@ -264,7 +283,7 @@ export const Dashboard: React.FC = () => {
                 <div className="space-y-4">
                   {agents.map((agent) => {
                     const agentStatus = getAgentStatus(agent);
-                    const hasPublicUrl = agent.vercel_url && isPublicHostedUrl(agent.vercel_url);
+                    const agentUrl = getAgentUrl(agent);
                     const isDeleting = deletingAgents.has(agent.id);
                     
                     return (
@@ -284,8 +303,17 @@ export const Dashboard: React.FC = () => {
                             <div className="font-medium text-gray-900 dark:text-white">
                               {agent.name} - {agent.brand_name}
                             </div>
-                            <div className="text-sm text-gray-500 dark:text-gray-400">
-                              {agent.agent_type.replace('-', ' ')} • Created {new Date(agent.created_at).toLocaleDateString()}
+                            <div className="text-sm text-gray-500 dark:text-gray-400 flex items-center space-x-2">
+                              <span>{agent.agent_type.replace('-', ' ')} • Created {new Date(agent.created_at).toLocaleDateString()}</span>
+                              {agent.subdomain && (
+                                <>
+                                  <span>•</span>
+                                  <div className="flex items-center space-x-1">
+                                    <Globe className="w-3 h-3" />
+                                    <span>{agent.subdomain}.pludo.online</span>
+                                  </div>
+                                </>
+                              )}
                             </div>
                           </div>
                         </div>
@@ -295,22 +323,22 @@ export const Dashboard: React.FC = () => {
                             {agentStatus.status}
                           </span>
                           
-                          {hasPublicUrl ? (
+                          {agentUrl && (
                             <Button
                               variant="outline"
                               size="sm"
-                              onClick={() => handlePreview(agent.vercel_url!)}
+                              onClick={() => handlePreview(agentUrl)}
                               className="flex items-center"
                             >
                               <Eye className="w-4 h-4 mr-1" />
                               Preview
                             </Button>
-                          ) : null}
+                          )}
 
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => navigate('/create')}
+                            onClick={() => handleEditAgent(agent.id)}
                             className="flex items-center"
                           >
                             <Edit className="w-4 h-4 mr-1" />
@@ -390,12 +418,13 @@ export const Dashboard: React.FC = () => {
             </h3>
             <div className="space-y-6">
               {(() => {
-                const liveAgents = agents.filter(agent => agent.vercel_url && isPublicHostedUrl(agent.vercel_url));
+                const liveAgents = agents.filter(agent => getAgentStatus(agent).status === 'live');
                 
                 if (liveAgents.length > 0) {
                   const agent = liveAgents[0]; // Show first live agent
-                  const embedCode = `<!-- ${agent.brand_name} AI Assistant - Generated by PLUDO.AI -->
-<script src="${agent.vercel_url}/widget.js" defer></script>`;
+                  const agentUrl = getAgentUrl(agent);
+                  const embedCode = agentUrl ? `<!-- ${agent.brand_name} AI Assistant - Generated by PLUDO.AI -->
+<script src="${agentUrl}/widget.js" defer></script>` : '';
                   
                   return (
                     <>
@@ -418,31 +447,33 @@ export const Dashboard: React.FC = () => {
                         </div>
                       </div>
 
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                          Direct Link
-                        </label>
-                        <div className="flex items-center space-x-2">
-                          <input
-                            type="text"
-                            value={agent.vercel_url}
-                            readOnly
-                            className="flex-1 p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-white"
-                          />
-                          <Button
-                            variant="outline"
-                            onClick={() => copyToClipboard(agent.vercel_url!)}
-                          >
-                            <Copy className="w-4 h-4" />
-                          </Button>
-                          <Button
-                            variant="outline"
-                            onClick={() => handlePreview(agent.vercel_url!)}
-                          >
-                            <ExternalLink className="w-4 h-4" />
-                          </Button>
+                      {agentUrl && (
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            Direct Link
+                          </label>
+                          <div className="flex items-center space-x-2">
+                            <input
+                              type="text"
+                              value={agentUrl}
+                              readOnly
+                              className="flex-1 p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-white"
+                            />
+                            <Button
+                              variant="outline"
+                              onClick={() => copyToClipboard(agentUrl)}
+                            >
+                              <Copy className="w-4 h-4" />
+                            </Button>
+                            <Button
+                              variant="outline"
+                              onClick={() => handlePreview(agentUrl)}
+                            >
+                              <ExternalLink className="w-4 h-4" />
+                            </Button>
+                          </div>
                         </div>
-                      </div>
+                      )}
 
                       <div className="bg-blue-50 dark:bg-blue-500/10 p-4 rounded-lg">
                         <h4 className="font-medium text-blue-900 dark:text-blue-200 mb-2">
@@ -454,6 +485,9 @@ export const Dashboard: React.FC = () => {
                           <li>Your AI agent will appear as a floating chat button</li>
                           <li>Test it on your website to ensure it&apos;s working correctly</li>
                         </ol>
+                        <div className="mt-3 p-2 bg-blue-100 dark:bg-blue-500/20 rounded text-xs text-blue-700 dark:text-blue-300">
+                          <strong>Custom Domain:</strong> Your agent is hosted on {agent.subdomain}.pludo.online for professional branding.
+                        </div>
                       </div>
                     </>
                   );
