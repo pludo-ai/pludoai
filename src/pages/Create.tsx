@@ -40,7 +40,7 @@ interface Agent {
   agentType: string;
   roleDescription: string;
   services: string[];
-  faqs: { question: string; answer: string }[];
+  faqs: { question: string; answer: string; id: string }[];
   primaryColor: string;
   tone: string;
   avatarUrl: string;
@@ -418,6 +418,15 @@ export const Create: React.FC = () => {
     toast.success('Copied to clipboard!');
   };
 
+  // Helper function to generate a unique subdomain
+  const generateSubdomain = (brandName: string): string => {
+    const cleanBrandName = brandName.toLowerCase().replace(/[^a-z0-9]/g, '-').substring(0, 20);
+    const userSuffix = user?.id.slice(-4) || Math.random().toString(36).substr(2, 4);
+    const randomSuffix = Math.random().toString(36).substr(2, 4);
+    const timestamp = Date.now().toString().slice(-6);
+    return `${cleanBrandName}-ai-agent-${userSuffix}-${randomSuffix}-${timestamp}`;
+  };
+
   const getStepIcon = (status: DeploymentStep['status']) => {
     switch (status) {
       case 'loading':
@@ -438,15 +447,6 @@ export const Create: React.FC = () => {
   const getCurrentModels = () => {
     const provider = getCurrentProvider();
     return provider ? provider.models : [];
-  };
-
-  // Helper function to generate a unique subdomain
-  const generateSubdomain = (brandName: string): string => {
-    const cleanBrandName = brandName.toLowerCase().replace(/[^a-z0-9]/g, '-').substring(0, 20);
-    const userSuffix = user?.id.slice(-4) || Math.random().toString(36).substr(2, 4);
-    const randomSuffix = Math.random().toString(36).substr(2, 4);
-    const timestamp = Date.now().toString().slice(-6);
-    return `${cleanBrandName}-ai-agent-${userSuffix}-${randomSuffix}-${timestamp}`;
   };
 
   // Check if buttons should be disabled
@@ -998,7 +998,7 @@ export const Create: React.FC = () => {
                       className="w-full"
                       loading={buttonStates.uploadRepo}
                     >
-                      <Server className="w-4 h-4 mr-2" />
+                      <Github className="w-4 h-4 mr-2" />
                       Upload to Repository
                     </Button>
 
@@ -1009,7 +1009,7 @@ export const Create: React.FC = () => {
                       className="w-full"
                       loading={buttonStates.deployCloud}
                     >
-                      <Cloud className="w-4 h-4 mr-2" />
+                      <Globe className="w-4 h-4 mr-2" />
                       Deploy to Cloud
                     </Button>
 
@@ -1022,7 +1022,7 @@ export const Create: React.FC = () => {
                         loading={buttonStates.makeItLive}
                       >
                         <Zap className="w-4 h-4 mr-2" />
-                        Make it Live
+                        Trigger Deployment
                       </Button>
                     )}
                   </div>
@@ -1076,7 +1076,7 @@ export const Create: React.FC = () => {
                           {deploymentResult.githubRepo && (
                             <div className="flex items-center justify-between p-3 bg-gray-100 dark:bg-gray-800 rounded-lg">
                               <div className="flex items-center space-x-2">
-                                <Server className="w-4 h-4 text-gray-600 dark:text-gray-400" />
+                                <Github className="w-4 h-4 text-gray-600 dark:text-gray-400" />
                                 <span className="text-sm text-gray-600 dark:text-gray-300">
                                   Repository
                                 </span>

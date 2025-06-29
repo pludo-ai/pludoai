@@ -5,7 +5,6 @@ import { Crown, Diamond, Bot, Menu, X, Sun, Moon } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { cn } from "../../lib/utils";
-import { useAuthStore } from "../../store/authStore";
 import { useThemeStore } from "../../store/themeStore";
 import { Dialog, DialogContent } from "./dialog";
 
@@ -80,7 +79,7 @@ function ElegantShape({
 
 function GeometricNavbar() {
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-    const { user } = useAuthStore();
+    const { user } = useThemeStore();
     const { isDark, toggleTheme } = useThemeStore();
 
     const navigation = [
@@ -327,7 +326,7 @@ function GeometricNavbar() {
 }
 
 export function HeroGeometric({
-    badge = "AI Excellence",
+    badge = "The Pinnacle of AI Excellence",
     title1 = "Craft Extraordinary",
     title2 = "AI Agents",
     description = "Where artificial intelligence meets uncompromising luxury. Create, deploy, and scale sophisticated AI agents that redefine customer excellence.",

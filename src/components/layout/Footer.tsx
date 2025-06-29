@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Bot, Github, Twitter, Linkedin } from 'lucide-react';
+import { Github, Twitter, Linkedin } from 'lucide-react';
 
 export const Footer: React.FC = () => {
   return (
@@ -73,6 +73,15 @@ export const Footer: React.FC = () => {
               Terms of Service
             </Link>
           </div>
+        </div>
+        
+        {/* Bigger logo in footer */}
+        <div className="mt-8 flex justify-center">
+          <img 
+            src="/pludo_svg_logo.svg" 
+            alt="PLUDO.AI Logo" 
+            className="w-16 h-16 opacity-50 dark:invert"
+          />
         </div>
       </div>
     </footer>
