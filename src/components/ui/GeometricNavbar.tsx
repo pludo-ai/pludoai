@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { Crown, Diamond, Menu, X, Sun, Moon } from "lucide-react";
+import { Crown, Menu, X, Sun, Moon } from "lucide-react";
 import { useAuthStore } from "../../store/authStore";
 import { useThemeStore } from "../../store/themeStore";
 import { Dialog, DialogContent, DialogTitle } from "./dialog";
