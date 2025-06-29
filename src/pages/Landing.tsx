@@ -313,129 +313,10 @@ const HorizontalFeatures: React.FC = () => {
   );
 };
 
-// Video Gallery Component
-const VideoGallery: React.FC = () => {
-  const [currentVideo, setCurrentVideo] = useState(0);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const { isDark } = useThemeStore();
-
-  const videos = [
-    {
-      src: "/Video_Ready_Futuristic_Ecosystem.mp4",
-      title: "Futuristic AI Ecosystem",
-      description: "Experience the next generation of AI agent technology"
-    },
-    {
-      src: "/Video_Animation_Request_Fulfilled (2).mp4", 
-      title: "Animation Request Fulfilled",
-      description: "See how our AI agents handle complex requests seamlessly"
-    },
-    {
-      src: "/Whisk_cauajge1ytyzogewltqzotutndjhos04mjuxlwy.mp4",
-      title: "Advanced AI Processing",
-      description: "Watch our sophisticated AI models in action"
-    }
-  ];
-
-  const handleVideoChange = (index: number) => {
-    setCurrentVideo(index);
-    setIsPlaying(false);
-    if (videoRef.current) {
-      videoRef.current.pause();
-      videoRef.current.currentTime = 0;
-    }
-  };
-
-  const togglePlayPause = () => {
-    if (videoRef.current) {
-      if (isPlaying) {
-        videoRef.current.pause();
-      } else {
-        videoRef.current.play();
-      }
-      setIsPlaying(!isPlaying);
-    }
-  };
-
-  return (
-    <div className={`rounded-2xl overflow-hidden border shadow-2xl ${
-      isDark 
-        ? 'bg-gradient-to-br from-[#1A1A1A] to-[#0A0A0A] border-yellow-500/30 shadow-yellow-500/20'
-        : 'bg-gradient-to-br from-white to-gray-50 border-gray-300/50 shadow-gray-400/20'
-    }`}>
-      <div className="relative aspect-video">
-        <video
-          ref={videoRef}
-          src={videos[currentVideo].src}
-          className="w-full h-full object-cover"
-          onPlay={() => setIsPlaying(true)}
-          onPause={() => setIsPlaying(false)}
-          onEnded={() => setIsPlaying(false)}
-        />
-        
-        {/* Video Controls Overlay */}
-        <div className="absolute inset-0 bg-black/20 opacity-0 hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
-          <button
-            onClick={togglePlayPause}
-            className={`w-16 h-16 rounded-full flex items-center justify-center transition-all duration-300 ${
-              isDark 
-                ? 'bg-yellow-500/90 hover:bg-yellow-500 text-black'
-                : 'bg-gray-800/90 hover:bg-gray-800 text-white'
-            }`}
-          >
-            {isPlaying ? <Pause className="w-8 h-8" /> : <Play className="w-8 h-8 ml-1" />}
-          </button>
-        </div>
-      </div>
-      
-      {/* Video Info */}
-      <div className="p-6">
-        <h3 className={`text-xl font-bold mb-2 ${
-          isDark ? 'text-white' : 'text-gray-900'
-        }`}>
-          {videos[currentVideo].title}
-        </h3>
-        <p className={`text-sm mb-4 ${
-          isDark ? 'text-gray-300' : 'text-gray-600'
-        }`}>
-          {videos[currentVideo].description}
-        </p>
-        
-        {/* Video Thumbnails */}
-        <div className="flex space-x-3">
-          {videos.map((video, index) => (
-            <button
-              key={index}
-              onClick={() => handleVideoChange(index)}
-              className={`relative w-20 h-12 rounded-lg overflow-hidden border-2 transition-all duration-300 ${
-                currentVideo === index
-                  ? isDark 
-                    ? 'border-yellow-500 shadow-lg shadow-yellow-500/30'
-                    : 'border-gray-800 shadow-lg shadow-gray-800/30'
-                  : 'border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500'
-              }`}
-            >
-              <video
-                src={video.src}
-                className="w-full h-full object-cover"
-                muted
-              />
-              <div className={`absolute inset-0 flex items-center justify-center ${
-                currentVideo === index ? 'bg-black/20' : 'bg-black/40'
-              }`}>
-                <Play className="w-4 h-4 text-white" />
-              </div>
-            </button>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-};
-
 export const Landing: React.FC = () => {
   const containerRef = useRef<HTMLDivElement>(null);
+  const heroVideoRef = useRef<HTMLVideoElement>(null);
+  const [videoMuted, setVideoMuted] = useState(true);
   const { isDark } = useThemeStore();
 
   useEffect(() => {
@@ -482,6 +363,15 @@ export const Landing: React.FC = () => {
             toggleActions: 'play none none reverse',
           },
         });
+      });
+
+      // Video scroll trigger
+      ScrollTrigger.create({
+        trigger: '.video-section',
+        start: 'top center',
+        end: 'bottom center',
+        onEnter: () => heroVideoRef.current?.play(),
+        onLeaveBack: () => heroVideoRef.current?.pause(),
       });
 
     }, containerRef);
@@ -682,8 +572,8 @@ export const Landing: React.FC = () => {
         </div>
       </section>
 
-      {/* Video Gallery Section */}
-      <section className={`py-20 md:py-32 relative overflow-hidden ${
+      {/* Video Section with Scroll Trigger */}
+      <section className={`video-section py-20 md:py-32 relative overflow-hidden ${
         isDark ? 'bg-black' : 'bg-gray-100'
       }`}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -699,8 +589,36 @@ export const Landing: React.FC = () => {
             </h2>
           </div>
           
-          <div className="fade-in-up">
-            <VideoGallery />
+          <div className={`fade-in-up relative rounded-2xl overflow-hidden border-2 shadow-2xl ${
+            isDark 
+              ? 'border-yellow-500/30 shadow-yellow-500/20' 
+              : 'border-gray-300/50 shadow-gray-400/20'
+          }`}>
+            <video
+              ref={heroVideoRef}
+              muted={videoMuted}
+              loop
+              playsInline
+              className="w-full h-auto"
+              style={{ aspectRatio: '16/9' }}
+            >
+              <source src="/hero-video.mp4" type="video/mp4" />
+            </video>
+            <div className={`absolute inset-0 pointer-events-none ${
+              isDark 
+                ? 'bg-gradient-to-t from-black/50 via-transparent to-transparent' 
+                : 'bg-gradient-to-t from-white/50 via-transparent to-transparent'
+            }`} />
+            <button
+              onClick={() => setVideoMuted(!videoMuted)}
+              className={`absolute bottom-4 right-4 w-12 h-12 backdrop-blur-md rounded-full flex items-center justify-center transition-all duration-300 ${
+                isDark 
+                  ? 'bg-yellow-500/20 text-yellow-400 hover:bg-yellow-500 hover:text-black'
+                  : 'bg-gray-800/20 text-gray-800 hover:bg-gray-800 hover:text-white'
+              }`}
+            >
+              {videoMuted ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
+            </button>
           </div>
         </div>
       </section>

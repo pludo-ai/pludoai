@@ -17,23 +17,19 @@ import {
   ExternalLink,
   Copy,
   Download,
-  Github,
   Globe,
   Zap,
   Key,
   Shield,
   Server,
-  Cloud,
-  Terminal,
-  Play
+  Cloud
 } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Textarea } from '../components/ui/Textarea';
 import { Card } from '../components/ui/Card';
 import { useAuthStore } from '../store/authStore';
-import { generateAgentCode, uploadToRepository, deployToCloud, triggerDeploymentWithFile } from '../lib/deployment';
-import { validateSubdomain } from '../lib/subdomain';
+import { generateAgentCode, uploadToRepository, deployToCloud, triggerDeploymentWithFile, regenerateAgent } from '../lib/deployment';
 import { supabase } from '../lib/supabase';
 import toast from 'react-hot-toast';
 
@@ -58,22 +54,19 @@ interface Agent {
   customModel: string;
 }
 
-interface TerminalLine {
+interface DeploymentStep {
   id: string;
-  text: string;
-  type: 'info' | 'success' | 'error' | 'command' | 'output';
-  timestamp: Date;
+  title: string;
+  status: 'pending' | 'loading' | 'success' | 'error';
+  message?: string;
 }
 
 export const Create: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuthStore();
   const [searchParams] = useSearchParams();
-  const editId = searchParams.get('edit');
-  
-  // Check if user already has an agent
-  const [existingAgent, setExistingAgent] = useState<any>(null);
-  const [loadingExisting, setLoadingExisting] = useState(true);
+  const editAgentId = searchParams.get('edit');
+  const isEditMode = !!editAgentId;
   
   // Form state
   const [formData, setFormData] = useState<Agent>({
@@ -99,16 +92,31 @@ export const Create: React.FC = () => {
     customModel: ''
   });
 
-  // Terminal deployment state
-  const [terminalLines, setTerminalLines] = useState<TerminalLine[]>([]);
-  const [isDeploying, setIsDeploying] = useState(false);
-  const [deploymentResult, setDeploymentResult] = useState<any>(null);
-  const [currentAgentId, setCurrentAgentId] = useState<string | null>(null);
-  const [showTerminal, setShowTerminal] = useState(false);
+  // Deployment state
+  const [deploymentSteps, setDeploymentSteps] = useState<DeploymentStep[]>([
+    { id: 'step-1', title: 'Generate Agent Code', status: 'pending' },
+    { id: 'step-2', title: 'Upload to Repository', status: 'pending' },
+    { id: 'step-3', title: 'Deploy to Cloud', status: 'pending' },
+  ]);
 
-  // Subdomain validation
-  const [subdomainValidation, setSubdomainValidation] = useState<any>(null);
-  const [isValidatingSubdomain, setIsValidatingSubdomain] = useState(false);
+  const [currentAgentId, setCurrentAgentId] = useState<string | null>(null);
+  const [deploymentResult, setDeploymentResult] = useState<any>(null);
+  const [isDeploying, setIsDeploying] = useState(false);
+  const [showDeployment, setShowDeployment] = useState(false);
+  
+  // Button states
+  const [buttonStates, setButtonStates] = useState({
+    generateCode: false,
+    uploadRepo: false,
+    deployCloud: false,
+    makeItLive: false,
+    updateAgent: false,
+  });
+
+  // Trigger deployment timer
+  const [triggerTimer, setTriggerTimer] = useState(45);
+  const [showTriggerButton, setShowTriggerButton] = useState(false);
+  const [triggerEnabled, setTriggerEnabled] = useState(false);
 
   // API Provider options
   const apiProviders = [
@@ -137,10 +145,59 @@ export const Create: React.FC = () => {
     }
   ];
 
-  // Check for existing agent on mount
+  // Load agent data for editing
   useEffect(() => {
-    checkExistingAgent();
-  }, [user]);
+    if (isEditMode && editAgentId && user) {
+      loadAgentForEditing(editAgentId);
+    }
+  }, [isEditMode, editAgentId, user]);
+
+  const loadAgentForEditing = async (agentId: string) => {
+    try {
+      const { data: agent, error } = await supabase
+        .from('agents')
+        .select('*')
+        .eq('id', agentId)
+        .eq('user_id', user!.id)
+        .single();
+
+      if (error) throw error;
+
+      if (agent) {
+        setFormData({
+          name: agent.name,
+          brandName: agent.brand_name,
+          websiteName: agent.website_name || '',
+          agentType: agent.agent_type,
+          roleDescription: agent.role_description,
+          services: agent.services || [''],
+          faqs: agent.faqs || [{ id: `faq-${Math.random().toString(36).substr(2, 8)}`, question: '', answer: '' }],
+          primaryColor: agent.primary_color,
+          tone: agent.tone,
+          avatarUrl: agent.avatar_url || '',
+          officeHours: agent.office_hours || '',
+          knowledge: agent.knowledge || '',
+          subdomain: agent.subdomain,
+          apiProvider: agent.api_provider || 'openrouter',
+          apiKey: agent.api_key || '',
+          model: agent.model || 'deepseek/deepseek-r1',
+          customModel: ''
+        });
+        setCurrentAgentId(agentId);
+      }
+    } catch (error: any) {
+      toast.error('Failed to load agent data: ' + error.message);
+      navigate('/dashboard');
+    }
+  };
+
+  // Auto-generate subdomain from brand name (only for new agents)
+  useEffect(() => {
+    if (!isEditMode && formData.brandName) {
+      const newSubdomain = generateSubdomain(formData.brandName);
+      setFormData(prev => ({ ...prev, subdomain: newSubdomain }));
+    }
+  }, [formData.brandName, isEditMode]);
 
   // Update available models when API provider changes
   useEffect(() => {
@@ -150,156 +207,26 @@ export const Create: React.FC = () => {
     }
   }, [formData.apiProvider]);
 
-  // Validate subdomain when it changes
+  // Trigger deployment timer effect
   useEffect(() => {
-    if (formData.subdomain && formData.subdomain.length >= 3) {
-      validateSubdomainInput(formData.subdomain);
-    } else {
-      setSubdomainValidation(null);
+    let interval: NodeJS.Timeout;
+    
+    if (showTriggerButton && !triggerEnabled && triggerTimer > 0) {
+      interval = setInterval(() => {
+        setTriggerTimer(prev => {
+          if (prev <= 1) {
+            setTriggerEnabled(true);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
     }
-  }, [formData.subdomain]);
 
-  const checkExistingAgent = async () => {
-    if (!user) return;
-
-    try {
-      const { data: agents, error } = await supabase
-        .from('agents')
-        .select('*')
-        .eq('user_id', user.id)
-        .limit(1);
-
-      if (error) throw error;
-
-      if (agents && agents.length > 0) {
-        setExistingAgent(agents[0]);
-        // If editing, populate form with existing data
-        if (editId === agents[0].id) {
-          populateFormWithAgent(agents[0]);
-        }
-      }
-    } catch (error: any) {
-      console.error('Error checking existing agent:', error);
-    } finally {
-      setLoadingExisting(false);
-    }
-  };
-
-  const populateFormWithAgent = (agent: any) => {
-    setFormData({
-      name: agent.name,
-      brandName: agent.brand_name,
-      websiteName: agent.website_name || '',
-      agentType: agent.agent_type,
-      roleDescription: agent.role_description,
-      services: agent.services || [''],
-      faqs: agent.faqs || [{ id: `faq-${Math.random().toString(36).substr(2, 8)}`, question: '', answer: '' }],
-      primaryColor: agent.primary_color,
-      tone: agent.tone,
-      avatarUrl: agent.avatar_url || '',
-      officeHours: agent.office_hours || '',
-      knowledge: agent.knowledge || '',
-      subdomain: agent.subdomain,
-      apiProvider: agent.api_provider || 'openrouter',
-      apiKey: agent.api_key || '',
-      model: agent.model || 'deepseek/deepseek-r1',
-      customModel: ''
-    });
-  };
-
-  const validateSubdomainInput = async (subdomain: string) => {
-    setIsValidatingSubdomain(true);
-    try {
-      const validation = await validateSubdomain(subdomain);
-      setSubdomainValidation(validation);
-    } catch (error) {
-      setSubdomainValidation({
-        isValid: false,
-        isAvailable: false,
-        error: 'Failed to validate subdomain'
-      });
-    } finally {
-      setIsValidatingSubdomain(false);
-    }
-  };
-
-  const addTerminalLine = (text: string, type: TerminalLine['type'] = 'info') => {
-    const newLine: TerminalLine = {
-      id: Math.random().toString(36).substr(2, 9),
-      text,
-      type,
-      timestamp: new Date()
+    return () => {
+      if (interval) clearInterval(interval);
     };
-    setTerminalLines(prev => [...prev, newLine]);
-  };
-
-  const clearTerminal = () => {
-    setTerminalLines([]);
-  };
-
-  const simulateTerminalDeployment = async () => {
-    clearTerminal();
-    setShowTerminal(true);
-    setIsDeploying(true);
-
-    // Terminal header
-    addTerminalLine('PLUDO.AI Deployment Terminal v2.1.0', 'info');
-    addTerminalLine('=====================================', 'info');
-    addTerminalLine('', 'info');
-
-    await new Promise(resolve => setTimeout(resolve, 500));
-
-    // Step 1: Code Generation
-    addTerminalLine('$ pludo generate --agent-config', 'command');
-    await new Promise(resolve => setTimeout(resolve, 800));
-    addTerminalLine('🔧 Initializing agent configuration...', 'output');
-    await new Promise(resolve => setTimeout(resolve, 600));
-    addTerminalLine('📝 Generating React components...', 'output');
-    await new Promise(resolve => setTimeout(resolve, 700));
-    addTerminalLine('🎨 Applying custom styling and branding...', 'output');
-    await new Promise(resolve => setTimeout(resolve, 500));
-    addTerminalLine('🧠 Configuring AI model integration...', 'output');
-    await new Promise(resolve => setTimeout(resolve, 600));
-    addTerminalLine('✅ Agent code generated successfully', 'success');
-    addTerminalLine('', 'info');
-
-    // Step 2: Repository Setup
-    addTerminalLine('$ pludo deploy --create-repo', 'command');
-    await new Promise(resolve => setTimeout(resolve, 700));
-    addTerminalLine('📦 Creating private repository...', 'output');
-    await new Promise(resolve => setTimeout(resolve, 800));
-    addTerminalLine('🔐 Setting up secure environment variables...', 'output');
-    await new Promise(resolve => setTimeout(resolve, 600));
-    addTerminalLine('📤 Pushing code to repository...', 'output');
-    await new Promise(resolve => setTimeout(resolve, 900));
-    addTerminalLine('✅ Repository created and configured', 'success');
-    addTerminalLine('', 'info');
-
-    // Step 3: Cloud Deployment
-    addTerminalLine('$ pludo deploy --production', 'command');
-    await new Promise(resolve => setTimeout(resolve, 800));
-    addTerminalLine('☁️ Initializing cloud deployment...', 'output');
-    await new Promise(resolve => setTimeout(resolve, 700));
-    addTerminalLine(`🌐 Configuring custom domain: ${formData.subdomain}.pludo.online`, 'output');
-    await new Promise(resolve => setTimeout(resolve, 800));
-    addTerminalLine('🔨 Building production assets...', 'output');
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    addTerminalLine('🚀 Deploying to global CDN...', 'output');
-    await new Promise(resolve => setTimeout(resolve, 900));
-    addTerminalLine('🔒 Configuring SSL certificates...', 'output');
-    await new Promise(resolve => setTimeout(resolve, 600));
-    addTerminalLine('✅ Deployment completed successfully', 'success');
-    addTerminalLine('', 'info');
-
-    // Final status
-    addTerminalLine('🎉 Your AI agent is now live!', 'success');
-    addTerminalLine(`🔗 URL: https://${formData.subdomain}.pludo.online`, 'success');
-    addTerminalLine('📋 Embed code generated and ready to use', 'success');
-    addTerminalLine('', 'info');
-    addTerminalLine('Deployment completed in 8.3 seconds', 'info');
-
-    setIsDeploying(false);
-  };
+  }, [showTriggerButton, triggerEnabled, triggerTimer]);
 
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -354,6 +281,24 @@ export const Create: React.FC = () => {
     }
   };
 
+  const updateDeploymentStep = (stepId: string, status: DeploymentStep['status'], message?: string) => {
+    setDeploymentSteps(prev => prev.map(step => 
+      step.id === stepId ? { ...step, status, message } : step
+    ));
+  };
+
+  const resetDeploymentSteps = () => {
+    setDeploymentSteps([
+      { id: 'step-1', title: 'Generate Agent Code', status: 'pending' },
+      { id: 'step-2', title: 'Upload to Repository', status: 'pending' },
+      { id: 'step-3', title: 'Deploy to Cloud', status: 'pending' },
+    ]);
+  };
+
+  const setButtonLoading = (button: keyof typeof buttonStates, loading: boolean) => {
+    setButtonStates(prev => ({ ...prev, [button]: loading }));
+  };
+
   const validateForm = () => {
     if (!formData.name.trim()) {
       toast.error('Agent name is required');
@@ -365,14 +310,6 @@ export const Create: React.FC = () => {
     }
     if (!formData.roleDescription.trim()) {
       toast.error('Role description is required');
-      return false;
-    }
-    if (!formData.subdomain.trim()) {
-      toast.error('Subdomain is required');
-      return false;
-    }
-    if (!subdomainValidation?.isValid || !subdomainValidation?.isAvailable) {
-      toast.error('Please choose a valid and available subdomain');
       return false;
     }
     if (formData.services.filter(s => s.trim()).length === 0) {
@@ -390,91 +327,240 @@ export const Create: React.FC = () => {
     return true;
   };
 
-  const handleCreateOrUpdateAgent = async () => {
+  const handleUpdateAgent = async () => {
+    if (!validateForm()) return;
+    if (!user || !currentAgentId) {
+      toast.error('Please sign in to continue');
+      return;
+    }
+
+    setIsDeploying(true);
+    setButtonLoading('updateAgent', true);
+
+    try {
+      // Use custom model if selected
+      const finalModel = formData.model === 'custom' ? formData.customModel : formData.model;
+
+      // Update agent in database
+      const { error: updateError } = await supabase
+        .from('agents')
+        .update({
+          name: formData.name,
+          brand_name: formData.brandName,
+          website_name: formData.websiteName,
+          agent_type: formData.agentType,
+          role_description: formData.roleDescription,
+          services: formData.services.filter(s => s.trim()),
+          faqs: formData.faqs.filter(faq => faq.question.trim() && faq.answer.trim()),
+          primary_color: formData.primaryColor,
+          tone: formData.tone,
+          avatar_url: formData.avatarUrl,
+          office_hours: formData.officeHours,
+          knowledge: formData.knowledge,
+          api_provider: formData.apiProvider,
+          api_key: formData.apiKey,
+          model: finalModel,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', currentAgentId);
+
+      if (updateError) throw updateError;
+
+      // Regenerate and update repository
+      const result = await regenerateAgent(currentAgentId);
+
+      if (result.success) {
+        toast.success('Agent updated successfully!');
+        navigate('/dashboard');
+      } else {
+        toast.error(result.error || 'Failed to update agent');
+      }
+    } catch (error: any) {
+      toast.error('Failed to update agent: ' + error.message);
+    } finally {
+      setIsDeploying(false);
+      setButtonLoading('updateAgent', false);
+    }
+  };
+
+  const handleGenerateCode = async () => {
     if (!validateForm()) return;
     if (!user) {
       toast.error('Please sign in to continue');
       return;
     }
 
-    // Start terminal deployment simulation
-    await simulateTerminalDeployment();
+    setIsDeploying(true);
+    setButtonLoading('generateCode', true);
+    setShowDeployment(true);
+    resetDeploymentSteps();
 
     try {
+      updateDeploymentStep('step-1', 'loading', 'Generating agent code...');
+
+      // Ensure subdomain is generated if not already
+      const finalSubdomain = formData.subdomain || generateSubdomain(formData.brandName);
+
       // Use custom model if selected
       const finalModel = formData.model === 'custom' ? formData.customModel : formData.model;
 
       const config = {
         ...formData,
+        subdomain: finalSubdomain,
         model: finalModel,
         services: formData.services.filter(s => s.trim()),
         faqs: formData.faqs.filter(faq => faq.question.trim() && faq.answer.trim()),
         userId: user.id,
       };
 
-      let result;
-      if (existingAgent && editId) {
-        // Update existing agent
-        const { error: updateError } = await supabase
-          .from('agents')
-          .update({
-            name: config.name,
-            brand_name: config.brandName,
-            website_name: config.websiteName,
-            agent_type: config.agentType,
-            role_description: config.roleDescription,
-            services: config.services,
-            faqs: config.faqs,
-            primary_color: config.primaryColor,
-            tone: config.tone,
-            avatar_url: config.avatarUrl,
-            subdomain: config.subdomain,
-            office_hours: config.officeHours,
-            knowledge: config.knowledge,
-            api_provider: config.apiProvider,
-            api_key: config.apiKey,
-            model: config.model,
-          })
-          .eq('id', existingAgent.id);
+      const result = await generateAgentCode(config);
 
-        if (updateError) throw updateError;
-
-        result = {
-          success: true,
-          agentId: existingAgent.id,
-          vercelUrl: `https://${config.subdomain}.pludo.online`,
-          embedCode: `<!-- ${config.brandName} AI Assistant - Generated by PLUDO.AI -->
-<script src="https://${config.subdomain}.pludo.online/widget.js" defer></script>`
-        };
+      if (result.success) {
+        updateDeploymentStep('step-1', 'success', 'Agent code generated successfully');
+        setCurrentAgentId(result.agentId!);
+        setDeploymentResult(result);
+        toast.success('Agent code generated successfully!');
       } else {
-        // Create new agent (full deployment process)
-        const codeResult = await generateAgentCode(config);
-        if (!codeResult.success) throw new Error(codeResult.error);
-
-        const repoResult = await uploadToRepository(codeResult.agentId!);
-        if (!repoResult.success) throw new Error(repoResult.error);
-
-        const deployResult = await deployToCloud(codeResult.agentId!);
-        if (!deployResult.success) throw new Error(deployResult.error);
-
-        result = deployResult;
+        updateDeploymentStep('step-1', 'error', result.error);
+        toast.error(result.error || 'Failed to generate agent code');
       }
-
-      setDeploymentResult(result);
-      setCurrentAgentId(result.agentId);
-      toast.success(existingAgent ? 'Agent updated successfully!' : 'Agent created and deployed successfully!');
-
     } catch (error: any) {
-      console.error('Deployment error:', error);
-      addTerminalLine('', 'info');
-      addTerminalLine('❌ Deployment failed: ' + error.message, 'error');
-      toast.error('Deployment failed: ' + error.message);
+      updateDeploymentStep('step-1', 'error', error.message);
+      toast.error('Failed to generate agent code');
+    } finally {
+      setIsDeploying(false);
+      setButtonLoading('generateCode', false);
+    }
+  };
+
+  const handleUploadToRepo = async () => {
+    if (!currentAgentId) {
+      toast.error('Please generate agent code first');
+      return;
+    }
+
+    setIsDeploying(true);
+    setButtonLoading('uploadRepo', true);
+
+    try {
+      updateDeploymentStep('step-2', 'loading', 'Creating repository...');
+
+      const result = await uploadToRepository(currentAgentId);
+
+      if (result.success) {
+        updateDeploymentStep('step-2', 'success', 'Uploaded to repository successfully');
+        setDeploymentResult(prev => ({ ...prev, ...result }));
+        toast.success('Code uploaded to repository successfully!');
+      } else {
+        updateDeploymentStep('step-2', 'error', result.error);
+        toast.error(result.error || 'Failed to upload to repository');
+      }
+    } catch (error: any) {
+      updateDeploymentStep('step-2', 'error', error.message);
+      toast.error('Failed to upload to repository');
+    } finally {
+      setIsDeploying(false);
+      setButtonLoading('uploadRepo', false);
+    }
+  };
+
+  const handleDeployToCloud = async () => {
+    if (!currentAgentId) {
+      toast.error('Please upload to repository first');
+      return;
+    }
+
+    setIsDeploying(true);
+    setButtonLoading('deployCloud', true);
+
+    // Show trigger button immediately and start timer
+    setShowTriggerButton(true);
+    setTriggerEnabled(false);
+    setTriggerTimer(45);
+
+    try {
+      updateDeploymentStep('step-3', 'loading', 'Deploying to cloud...');
+
+      const result = await deployToCloud(currentAgentId);
+
+      if (result.success) {
+        updateDeploymentStep('step-3', 'success', 'Deployed to cloud successfully');
+        setDeploymentResult(prev => ({ ...prev, ...result }));
+        toast.success('Agent deployed successfully!');
+        
+        // Hide trigger button if deployment was successful
+        setShowTriggerButton(false);
+      } else {
+        updateDeploymentStep('step-3', 'error', result.error);
+        toast.error('Failed to deploy to cloud');
+      }
+    } catch (error: any) {
+      updateDeploymentStep('step-3', 'error', error.message);
+      toast.error('Failed to deploy to cloud');
+    } finally {
+      setIsDeploying(false);
+      setButtonLoading('deployCloud', false);
+    }
+  };
+
+  const handleMakeItLive = async () => {
+    if (!currentAgentId) {
+      toast.error('Please complete the deployment process first');
+      return;
+    }
+
+    setButtonLoading('makeItLive', true);
+
+    try {
+      toast.loading('Triggering production deployment...', { id: 'make-live' });
+
+      const result = await triggerDeploymentWithFile(currentAgentId);
+
+      if (result.success) {
+        toast.success('Production deployment triggered! Your agent will be live shortly.', { id: 'make-live' });
+        
+        // Update deployment result if needed
+        if (result.vercelUrl) {
+          setDeploymentResult(prev => ({ ...prev, ...result }));
+        }
+        
+        // Hide trigger button after successful trigger
+        setShowTriggerButton(false);
+      } else {
+        toast.error(result.error || 'Failed to trigger deployment', { id: 'make-live' });
+      }
+    } catch (error: any) {
+      toast.error('Failed to trigger deployment', { id: 'make-live' });
+    } finally {
+      setButtonLoading('makeItLive', false);
     }
   };
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
     toast.success('Copied to clipboard!');
+  };
+
+  // Helper function to generate a unique subdomain
+  const generateSubdomain = (brandName: string): string => {
+    const cleanBrandName = brandName.toLowerCase().replace(/[^a-z0-9]/g, '-').substring(0, 20);
+    const userSuffix = user?.id.slice(-4) || Math.random().toString(36).substr(2, 4);
+    const randomSuffix = Math.random().toString(36).substr(2, 4);
+    const timestamp = Date.now().toString().slice(-6);
+    return `${cleanBrandName}-ai-agent-${userSuffix}-${randomSuffix}-${timestamp}`;
+  };
+
+  const getStepIcon = (status: DeploymentStep['status']) => {
+    switch (status) {
+      case 'loading':
+        return <div className="w-5 h-5 border-2 border-yellow-500 dark:border-yellow-500 border-t-transparent rounded-full animate-spin" />;
+      case 'success':
+        return <CheckCircle className="w-5 h-5 text-green-600 dark:text-green-400" />;
+      case 'error':
+        return <AlertCircle className="w-5 h-5 text-red-600 dark:text-red-400" />;
+      default:
+        return <div className="w-5 h-5 border-2 border-gray-400 dark:border-gray-600 rounded-full" />;
+    }
   };
 
   const getCurrentProvider = () => {
@@ -486,20 +572,11 @@ export const Create: React.FC = () => {
     return provider ? provider.models : [];
   };
 
-  const getTerminalLineColor = (type: TerminalLine['type']) => {
-    switch (type) {
-      case 'command':
-        return 'text-blue-400';
-      case 'success':
-        return 'text-green-400';
-      case 'error':
-        return 'text-red-400';
-      case 'output':
-        return 'text-gray-300';
-      default:
-        return 'text-gray-400';
-    }
-  };
+  // Check if buttons should be disabled
+  const isGenerateCodeDisabled = buttonStates.generateCode || isDeploying;
+  const isUploadRepoDisabled = buttonStates.uploadRepo || isDeploying || deploymentSteps[0]?.status !== 'success';
+  const isDeployCloudDisabled = buttonStates.deployCloud || isDeploying || deploymentSteps[1]?.status !== 'success';
+  const isMakeItLiveDisabled = buttonStates.makeItLive || !showTriggerButton || !triggerEnabled;
 
   if (!user) {
     return (
@@ -524,67 +601,6 @@ export const Create: React.FC = () => {
     );
   }
 
-  if (loadingExisting) {
-    return (
-      <div className="min-h-screen bg-white dark:bg-[#0A0A0A] pt-16 transition-colors duration-300 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-yellow-500"></div>
-      </div>
-    );
-  }
-
-  // If user has an agent and not editing, redirect to dashboard
-  if (existingAgent && !editId) {
-    return (
-      <div className="min-h-screen bg-white dark:bg-[#0A0A0A] pt-16 transition-colors duration-300">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="text-center">
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.8 }}
-            >
-              <div className="bg-gradient-to-br from-gray-50 via-white to-gray-100 dark:from-[#1A1A1A] dark:via-[#0A0A0A] dark:to-black border border-gray-300/50 dark:border-yellow-500/30 rounded-2xl shadow-2xl shadow-gray-400/20 dark:shadow-yellow-500/20 p-8 transition-all duration-300">
-                <img 
-                  src="https://pludo.online/pludo_svg_logo.svg" 
-                  alt="PLUDO.AI Logo" 
-                  className="w-16 h-16 mx-auto mb-6 opacity-70"
-                />
-                <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
-                  You Already Have an AI Agent
-                </h2>
-                <p className="text-gray-600 dark:text-gray-400 mb-6">
-                  You can only have one AI agent per account. You can edit your existing agent or view it in the dashboard.
-                </p>
-                <div className="bg-gray-100 dark:bg-gray-800/50 rounded-lg p-4 mb-6">
-                  <h3 className="font-semibold text-gray-900 dark:text-white mb-2">
-                    {existingAgent.name} - {existingAgent.brand_name}
-                  </h3>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">
-                    {existingAgent.subdomain}.pludo.online
-                  </p>
-                </div>
-                <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                  <Button 
-                    onClick={() => navigate('/dashboard')}
-                    className="bg-gradient-to-r from-gray-800 to-gray-700 dark:from-yellow-500 dark:to-yellow-400 hover:from-gray-700 hover:to-gray-600 dark:hover:from-yellow-400 dark:hover:to-yellow-300 text-white dark:text-black font-bold"
-                  >
-                    Go to Dashboard
-                  </Button>
-                  <Button 
-                    onClick={() => navigate(`/create?edit=${existingAgent.id}`)}
-                    variant="outline"
-                  >
-                    Edit Agent
-                  </Button>
-                </div>
-              </div>
-            </motion.div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen bg-white dark:bg-[#0A0A0A] pt-16 transition-colors duration-300">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -596,13 +612,13 @@ export const Create: React.FC = () => {
             transition={{ duration: 0.8 }}
           >
             <h1 className="text-4xl md:text-5xl font-bold text-gray-900 dark:text-white mb-4">
-              {existingAgent && editId ? 'Edit Your' : 'Create Your'}{' '}
+              {isEditMode ? 'Edit Your' : 'Create Your'}{' '}
               <span className="bg-gradient-to-r from-gray-800 to-gray-700 dark:from-yellow-400 dark:to-yellow-500 bg-clip-text text-transparent">
                 AI Agent
               </span>
             </h1>
             <p className="text-xl text-gray-600 dark:text-gray-400 max-w-3xl mx-auto">
-              {existingAgent && editId 
+              {isEditMode 
                 ? 'Update your intelligent AI assistant configuration and settings.'
                 : 'Design, customize, and deploy your intelligent AI assistant in minutes. No coding required.'
               }
@@ -685,72 +701,33 @@ export const Create: React.FC = () => {
                   />
                 </div>
 
-                {/* Subdomain Input */}
-                <div className="mt-6">
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Choose Your Subdomain *
-                  </label>
-                  <div className="flex items-center space-x-2">
-                    <div className="flex-1 relative">
-                      <Input
-                        value={formData.subdomain}
-                        onChange={(e) => handleInputChange('subdomain', e.target.value.toLowerCase())}
-                        placeholder="your-brand"
-                        required
-                        className={`pr-4 ${
-                          subdomainValidation?.isValid === false 
-                            ? 'border-red-500 focus:border-red-500 focus:ring-red-500/20' 
-                            : subdomainValidation?.isAvailable 
-                              ? 'border-green-500 focus:border-green-500 focus:ring-green-500/20'
-                              : ''
-                        }`}
-                      />
-                      {isValidatingSubdomain && (
-                        <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
-                          <div className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin"></div>
-                        </div>
-                      )}
+                {/* Auto-generated Subdomain Display */}
+                {formData.subdomain && (
+                  <div className="mt-6">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Generated Subdomain
+                    </label>
+                    <div className="flex items-center space-x-2 p-3 bg-gray-100 dark:bg-gray-800 rounded-lg">
+                      <code className="text-sm text-gray-600 dark:text-gray-300 flex-1">
+                        {formData.subdomain}
+                      </code>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => copyToClipboard(formData.subdomain)}
+                      >
+                        <Copy className="w-4 h-4" />
+                      </Button>
                     </div>
-                    <span className="text-gray-600 dark:text-gray-400 font-medium">
-                      .pludo.online
-                    </span>
+                    <p className="text-xs text-gray-500 mt-1">
+                      This unique identifier is automatically generated for your agent
+                    </p>
                   </div>
-                  
-                  {subdomainValidation && (
-                    <div className={`mt-2 text-sm ${
-                      subdomainValidation.isValid && subdomainValidation.isAvailable
-                        ? 'text-green-600 dark:text-green-400'
-                        : 'text-red-600 dark:text-red-400'
-                    }`}>
-                      {subdomainValidation.isValid && subdomainValidation.isAvailable
-                        ? '✅ Subdomain is available!'
-                        : subdomainValidation.error
-                      }
-                      {subdomainValidation.suggestion && (
-                        <div className="mt-1">
-                          <span className="text-gray-600 dark:text-gray-400">
-                            Suggestion: 
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => handleInputChange('subdomain', subdomainValidation.suggestion)}
-                            className="ml-1 text-blue-600 dark:text-blue-400 hover:underline"
-                          >
-                            {subdomainValidation.suggestion}
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                  
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                    Your agent will be available at: https://{formData.subdomain || 'your-subdomain'}.pludo.online
-                  </p>
-                </div>
+                )}
               </div>
             </motion.div>
 
-            {/* API Configuration */}
+            {/* AI Configuration */}
             <motion.div
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
@@ -767,7 +744,7 @@ export const Create: React.FC = () => {
                 </div>
 
                 <div className="space-y-6">
-                  {/* API Provider Selection */}
+                  {/* AI Provider Selection */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
                       AI Provider
@@ -835,7 +812,7 @@ export const Create: React.FC = () => {
                         required
                       />
                       <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                        Enter the exact model name as it appears in the OpenRouter documentation
+                        Enter the exact model name as it appears in the provider documentation
                       </p>
                     </div>
                   )}
@@ -858,12 +835,12 @@ export const Create: React.FC = () => {
                           <strong>Secure:</strong> Your API key is encrypted and stored securely. It's only used to power your AI agent's conversations.
                           {formData.apiProvider === 'openrouter' && (
                             <div className="mt-1">
-                              Get your API key from <a href="https://openrouter.ai/keys" target="_blank" rel="noopener noreferrer" className="underline">OpenRouter Dashboard</a>
+                              Get your API key from the provider dashboard
                             </div>
                           )}
                           {formData.apiProvider === 'gemini' && (
                             <div className="mt-1">
-                              Get your API key from <a href="https://makersuite.google.com/app/apikey" target="_blank" rel="noopener noreferrer" className="underline">Google AI Studio</a>
+                              Get your API key from Google AI Studio
                             </div>
                           )}
                         </div>
@@ -1085,16 +1062,27 @@ export const Create: React.FC = () => {
                   
                   <div className="bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-800 dark:to-gray-900 rounded-lg p-4 mb-4">
                     <div className="flex items-center space-x-3 mb-3">
-                      <div 
-                        className="w-10 h-10 rounded-full flex items-center justify-center text-white"
-                        style={{ backgroundColor: formData.primaryColor }}
-                      >
+                      {formData.avatarUrl ? (
                         <img 
-                          src="https://pludo.online/pludo_svg_logo.svg" 
-                          alt="PLUDO.AI Logo" 
-                          className="w-6 h-6"
+                          src={formData.avatarUrl} 
+                          alt={formData.name}
+                          className="w-10 h-10 rounded-full"
+                          onError={(e) => {
+                            e.currentTarget.style.display = 'none';
+                          }}
                         />
-                      </div>
+                      ) : (
+                        <div 
+                          className="w-10 h-10 rounded-full flex items-center justify-center text-white"
+                          style={{ backgroundColor: formData.primaryColor }}
+                        >
+                          <img 
+                            src="https://pludo.online/pludo_svg_logo.svg" 
+                            alt="PLUDO.AI Logo" 
+                            className="w-6 h-6"
+                          />
+                        </div>
+                      )}
                       <div>
                         <div className="font-medium text-gray-900 dark:text-white">
                           {formData.name || 'Agent Name'}
@@ -1114,123 +1102,189 @@ export const Create: React.FC = () => {
                     <div className="text-xs text-gray-500 space-y-1">
                       <div>Tone: {formData.tone} • Type: {formData.agentType.replace('-', ' ')}</div>
                       <div>AI: {getCurrentProvider()?.name} • Model: {getCurrentModels().find(m => m.id === formData.model)?.name || (formData.model === 'custom' ? formData.customModel : formData.model)}</div>
-                      {formData.subdomain && (
-                        <div className="flex items-center space-x-1 mt-2">
-                          <Globe className="w-3 h-3" />
-                          <span>{formData.subdomain}.pludo.online</span>
-                        </div>
-                      )}
                     </div>
                   </div>
 
                   <div className="space-y-3">
-                    <Button
-                      onClick={handleCreateOrUpdateAgent}
-                      disabled={isDeploying || !subdomainValidation?.isAvailable}
-                      className="w-full bg-gradient-to-r from-gray-800 to-gray-700 dark:from-yellow-500 dark:to-yellow-400 hover:from-gray-700 hover:to-gray-600 dark:hover:from-yellow-400 dark:hover:to-yellow-300 text-white dark:text-black font-bold"
-                      loading={isDeploying}
-                    >
-                      <Rocket className="w-4 h-4 mr-2" />
-                      {existingAgent && editId ? 'Update Agent' : 'Deploy Agent'}
-                    </Button>
+                    {isEditMode ? (
+                      <Button
+                        onClick={handleUpdateAgent}
+                        disabled={buttonStates.updateAgent}
+                        className="w-full bg-gradient-to-r from-gray-800 to-gray-700 dark:from-yellow-500 dark:to-yellow-400 hover:from-gray-700 hover:to-gray-600 dark:hover:from-yellow-400 dark:hover:to-yellow-300 text-white dark:text-black font-bold"
+                        loading={buttonStates.updateAgent}
+                      >
+                        <Upload className="w-4 h-4 mr-2" />
+                        Update Agent
+                      </Button>
+                    ) : (
+                      <>
+                        <Button
+                          onClick={handleGenerateCode}
+                          disabled={isGenerateCodeDisabled}
+                          className="w-full bg-gradient-to-r from-gray-800 to-gray-700 dark:from-yellow-500 dark:to-yellow-400 hover:from-gray-700 hover:to-gray-600 dark:hover:from-yellow-400 dark:hover:to-yellow-300 text-white dark:text-black font-bold"
+                          loading={buttonStates.generateCode}
+                        >
+                          <Code className="w-4 h-4 mr-2" />
+                          Generate Agent Code
+                        </Button>
+
+                        <Button
+                          onClick={handleUploadToRepo}
+                          disabled={isUploadRepoDisabled}
+                          variant="outline"
+                          className="w-full"
+                          loading={buttonStates.uploadRepo}
+                        >
+                          <Upload className="w-4 h-4 mr-2" />
+                          Upload to Repository
+                        </Button>
+
+                        <Button
+                          onClick={handleDeployToCloud}
+                          disabled={isDeployCloudDisabled}
+                          variant="secondary"
+                          className="w-full"
+                          loading={buttonStates.deployCloud}
+                        >
+                          <Globe className="w-4 h-4 mr-2" />
+                          Deploy to Cloud
+                        </Button>
+
+                        {/* Trigger Deployment Button */}
+                        {showTriggerButton && (
+                          <Button
+                            onClick={handleMakeItLive}
+                            disabled={isMakeItLiveDisabled}
+                            className={`w-full font-bold ${
+                              triggerEnabled
+                                ? 'bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white'
+                                : 'bg-gray-400 dark:bg-gray-600 text-gray-600 dark:text-gray-400 cursor-not-allowed'
+                            }`}
+                            loading={buttonStates.makeItLive}
+                          >
+                            <Zap className="w-4 h-4 mr-2" />
+                            {triggerEnabled ? 'Trigger Deployment' : `Wait ${triggerTimer}s`}
+                          </Button>
+                        )}
+                      </>
+                    )}
                   </div>
                 </div>
               </motion.div>
 
-              {/* Terminal */}
-              {showTerminal && (
-                <motion.div
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.5 }}
-                >
-                  <div className="bg-black rounded-2xl shadow-2xl overflow-hidden">
-                    <div className="bg-gray-800 px-4 py-2 flex items-center space-x-2">
-                      <div className="w-3 h-3 bg-red-500 rounded-full"></div>
-                      <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
-                      <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-                      <span className="text-gray-300 text-sm ml-4 flex items-center">
-                        <Terminal className="w-4 h-4 mr-2" />
-                        PLUDO.AI Terminal
-                      </span>
-                    </div>
-                    <div className="p-4 h-96 overflow-y-auto font-mono text-sm">
-                      {terminalLines.map((line) => (
-                        <div key={line.id} className={`${getTerminalLineColor(line.type)} mb-1`}>
-                          {line.text}
-                        </div>
-                      ))}
-                      {isDeploying && (
-                        <div className="text-green-400 animate-pulse">
-                          <span className="inline-block w-2 h-4 bg-green-400 animate-pulse"></span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </motion.div>
-              )}
-
-              {/* Results */}
-              {deploymentResult && (
+              {/* Deployment Progress */}
+              {showDeployment && !isEditMode && (
                 <motion.div
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.5 }}
                 >
                   <div className="bg-gradient-to-br from-gray-50 via-white to-gray-100 dark:from-[#1A1A1A] dark:via-[#0A0A0A] dark:to-black border border-gray-300/50 dark:border-yellow-500/30 rounded-2xl shadow-2xl shadow-gray-400/20 dark:shadow-yellow-500/20 p-6 transition-all duration-300">
-                    <h4 className="font-medium text-gray-900 dark:text-white mb-3 flex items-center">
-                      <CheckCircle className="w-5 h-5 text-green-600 dark:text-green-400 mr-2" />
-                      Deployment Complete!
-                    </h4>
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+                      Deployment Progress
+                    </h3>
                     
-                    <div className="space-y-3">
-                      {deploymentResult.vercelUrl && (
-                        <div className="flex items-center justify-between p-3 bg-gray-100 dark:bg-gray-800 rounded-lg">
-                          <div className="flex items-center space-x-2">
-                            <Globe className="w-4 h-4 text-gray-600 dark:text-gray-400" />
-                            <span className="text-sm text-gray-600 dark:text-gray-300">
-                              Live URL
-                            </span>
+                    <div className="space-y-4">
+                      {deploymentSteps.map((step) => (
+                        <div key={step.id} className="flex items-start space-x-3">
+                          <div className="flex-shrink-0 mt-0.5">
+                            {getStepIcon(step.status)}
                           </div>
-                          <div className="flex items-center space-x-2">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => window.open(deploymentResult.vercelUrl, '_blank')}
-                            >
-                              <Eye className="w-4 h-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => copyToClipboard(deploymentResult.vercelUrl)}
-                            >
-                              <Copy className="w-4 h-4" />
-                            </Button>
+                          <div className="flex-1 min-w-0">
+                            <div className="text-sm font-medium text-gray-900 dark:text-white">
+                              {step.title}
+                            </div>
+                            {step.message && (
+                              <div className={`text-xs mt-1 ${
+                                step.status === 'error' 
+                                  ? 'text-red-600 dark:text-red-400' 
+                                  : 'text-gray-500 dark:text-gray-400'
+                              }`}>
+                                {step.message}
+                              </div>
+                            )}
                           </div>
                         </div>
-                      )}
-
-                      {deploymentResult.embedCode && (
-                        <div className="p-3 bg-gray-100 dark:bg-gray-800 rounded-lg">
-                          <div className="flex items-center justify-between mb-2">
-                            <span className="text-sm font-medium text-gray-600 dark:text-gray-300">
-                              Embed Code
-                            </span>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => copyToClipboard(deploymentResult.embedCode)}
-                            >
-                              <Copy className="w-4 h-4" />
-                            </Button>
-                          </div>
-                          <code className="text-xs text-gray-500 dark:text-gray-400 break-all">
-                            {deploymentResult.embedCode}
-                          </code>
-                        </div>
-                      )}
+                      ))}
                     </div>
+
+                    {/* Results */}
+                    {deploymentResult && (
+                      <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
+                        <h4 className="font-medium text-gray-900 dark:text-white mb-3">
+                          Deployment Results
+                        </h4>
+                        
+                        <div className="space-y-3">
+                          {deploymentResult.githubRepo && (
+                            <div className="flex items-center justify-between p-3 bg-gray-100 dark:bg-gray-800 rounded-lg">
+                              <div className="flex items-center space-x-2">
+                                <Server className="w-4 h-4 text-gray-600 dark:text-gray-400" />
+                                <span className="text-sm text-gray-600 dark:text-gray-300">
+                                  Repository
+                                </span>
+                              </div>
+                              <div className="flex items-center space-x-2">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => window.open(deploymentResult.githubRepo, '_blank')}
+                                >
+                                  <ExternalLink className="w-4 h-4" />
+                                </Button>
+                              </div>
+                            </div>
+                          )}
+
+                          {deploymentResult.vercelUrl && (
+                            <div className="flex items-center justify-between p-3 bg-gray-100 dark:bg-gray-800 rounded-lg">
+                              <div className="flex items-center space-x-2">
+                                <Globe className="w-4 h-4 text-gray-600 dark:text-gray-400" />
+                                <span className="text-sm text-gray-600 dark:text-gray-300">
+                                  Live URL
+                                </span>
+                              </div>
+                              <div className="flex items-center space-x-2">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => window.open(deploymentResult.vercelUrl, '_blank')}
+                                >
+                                  <Eye className="w-4 h-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => copyToClipboard(deploymentResult.vercelUrl)}
+                                >
+                                  <Copy className="w-4 h-4" />
+                                </Button>
+                              </div>
+                            </div>
+                          )}
+
+                          {deploymentResult.embedCode && (
+                            <div className="p-3 bg-gray-100 dark:bg-gray-800 rounded-lg">
+                              <div className="flex items-center justify-between mb-2">
+                                <span className="text-sm font-medium text-gray-600 dark:text-gray-300">
+                                  Embed Code
+                                </span>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => copyToClipboard(deploymentResult.embedCode)}
+                                >
+                                  <Copy className="w-4 h-4" />
+                                </Button>
+                              </div>
+                              <code className="text-xs text-gray-500 dark:text-gray-400 break-all">
+                                {deploymentResult.embedCode}
+                              </code>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </motion.div>
               )}
