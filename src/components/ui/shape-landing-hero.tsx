@@ -104,19 +104,24 @@ function GeometricNavbar() {
                             className="relative"
                         >
                             <img 
-                                src="/pludo_svg_logo.svg" 
+                                src="https://pludo.online/pludo_svg_logo.svg" 
                                 alt="PLUDO.AI Logo" 
                                 className="w-10 h-10"
                             />
                         </motion.div>
                         <div className="flex flex-col">
-                            <span className={`text-lg font-black bg-gradient-to-r bg-clip-text text-transparent tracking-wide ${
-                                isDark 
-                                    ? 'from-yellow-400 via-yellow-500 to-yellow-400'
-                                    : 'from-gray-800 via-gray-700 to-gray-800'
-                            }`}>
-                                PLUDO.AI
-                            </span>
+                            <div className="flex items-center space-x-2">
+                                <span className={`text-lg font-black bg-gradient-to-r bg-clip-text text-transparent tracking-wide ${
+                                    isDark 
+                                        ? 'from-yellow-400 via-yellow-500 to-yellow-400'
+                                        : 'from-gray-800 via-gray-700 to-gray-800'
+                                }`}>
+                                    PLUDO.AI
+                                </span>
+                                <span className="px-1.5 py-0.5 text-xs font-bold bg-gradient-to-r from-yellow-500 to-yellow-400 text-black rounded-full">
+                                    BETA
+                                </span>
+                            </div>
                             <span className={`text-xs font-medium tracking-widest uppercase opacity-80 hidden sm:block ${
                                 isDark ? 'text-gray-400' : 'text-gray-600'
                             }`}>
@@ -203,17 +208,22 @@ function GeometricNavbar() {
                     <div className="flex items-center justify-between">
                         <Link to="/" className="flex items-center space-x-2">
                             <img 
-                                src="/pludo_svg_logo.svg" 
+                                src="https://pludo.online/pludo_svg_logo.svg" 
                                 alt="PLUDO.AI Logo" 
                                 className="h-8 w-auto"
                             />
-                            <span className={`text-lg font-bold bg-gradient-to-r bg-clip-text text-transparent ${
-                                isDark 
-                                    ? 'from-yellow-400 to-yellow-500'
-                                    : 'from-gray-800 to-gray-700'
-                            }`}>
-                                PLUDO.AI
-                            </span>
+                            <div className="flex items-center space-x-2">
+                                <span className={`text-lg font-bold bg-gradient-to-r bg-clip-text text-transparent ${
+                                    isDark 
+                                        ? 'from-yellow-400 to-yellow-500'
+                                        : 'from-gray-800 to-gray-700'
+                                }`}>
+                                    PLUDO.AI
+                                </span>
+                                <span className="px-1.5 py-0.5 text-xs font-bold bg-gradient-to-r from-yellow-500 to-yellow-400 text-black rounded-full">
+                                    BETA
+                                </span>
+                            </div>
                         </Link>
                         <button
                             type="button"
@@ -426,7 +436,7 @@ export function HeroGeometric({
                             }`}
                         >
                             <img 
-                                src="/pludo_svg_logo.svg" 
+                                src="https://pludo.online/pludo_svg_logo.svg" 
                                 alt="PLUDO.AI Logo" 
                                 className="h-3 w-3"
                             />
@@ -434,6 +444,9 @@ export function HeroGeometric({
                                 isDark ? 'text-white/70' : 'text-gray-700'
                             }`}>
                                 {badge}
+                            </span>
+                            <span className="px-1.5 py-0.5 text-xs font-bold bg-gradient-to-r from-yellow-500 to-yellow-400 text-black rounded-full">
+                                BETA
                             </span>
                             <Diamond className={`h-3 w-3 ${
                                 isDark ? 'text-gray-400' : 'text-gray-600'
@@ -500,7 +513,7 @@ export function HeroGeometric({
                                 }`}
                             >
                                 <img 
-                                    src="/pludo_svg_logo.svg" 
+                                    src="https://pludo.online/pludo_svg_logo.svg" 
                                     alt="PLUDO.AI Logo" 
                                     className="w-5 h-5 mr-2"
                                 />
@@ -532,7 +545,7 @@ export function HeroGeometric({
                         >
                             {[
                                 { number: "100K+", label: "Elite Agents" },
-                                { number: "99.99%", label: "Uptime" },
+                                { number: "99.9%", label: "Uptime" },
                                 { number: "5M+", label: "Interactions" },
                                 { number: "195", label: "Countries" }
                             ].map((stat, index) => (
@@ -558,28 +571,6 @@ export function HeroGeometric({
                     </div>
                 </div>
 
-                {/* Scroll Indicator */}
-                <motion.div
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={{ delay: 2 }}
-                    className="absolute bottom-6 left-1/2 -translate-x-1/2 flex flex-col items-center space-y-2"
-                >
-                    <span className={`text-xs uppercase tracking-widest font-medium ${
-                        isDark ? 'text-yellow-400/60' : 'text-gray-600'
-                    }`}>Discover Excellence</span>
-                    <motion.div
-                        animate={{ y: [0, 8, 0] }}
-                        transition={{ duration: 2, repeat: Number.POSITIVE_INFINITY }}
-                        className={`w-5 h-8 border-2 rounded-full flex justify-center ${
-                            isDark ? 'border-yellow-500/40' : 'border-gray-800/40'
-                        }`}
-                    >
-                        <div className={`w-1 h-2 rounded-full mt-1 ${
-                            isDark ? 'bg-yellow-500' : 'bg-gray-800'
-                        }`} />
-                    </motion.div>
-                </motion.div>
 
                 {/* Gradient Overlays */}
                 <div className={`absolute inset-0 pointer-events-none ${
