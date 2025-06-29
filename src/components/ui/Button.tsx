@@ -21,10 +21,10 @@ export const Button: React.FC<ButtonProps> = ({
   const baseClasses = 'inline-flex items-center justify-center font-medium rounded-xl transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed';
   
   const variants = {
-    primary: 'bg-gradient-to-r from-primary-600 to-primary-700 hover:from-primary-700 hover:to-primary-800 text-white shadow-lg hover:shadow-xl focus:ring-primary-500',
-    secondary: 'bg-gradient-to-r from-secondary-600 to-secondary-700 hover:from-secondary-700 hover:to-secondary-800 text-white shadow-lg hover:shadow-xl focus:ring-secondary-500',
-    outline: 'border-2 border-primary-600 text-primary-600 hover:bg-primary-600 hover:text-white focus:ring-primary-500',
-    ghost: 'text-gray-600 hover:text-gray-900 hover:bg-gray-100 focus:ring-gray-500',
+    primary: 'bg-gradient-to-r from-yellow-600 to-yellow-700 dark:from-yellow-500 dark:to-yellow-600 hover:from-yellow-700 hover:to-yellow-800 dark:hover:from-yellow-600 dark:hover:to-yellow-700 text-white dark:text-black shadow-lg hover:shadow-xl focus:ring-yellow-500',
+    secondary: 'bg-gradient-to-r from-gray-600 to-gray-700 dark:from-gray-400 dark:to-gray-500 hover:from-gray-700 hover:to-gray-800 dark:hover:from-gray-500 dark:hover:to-gray-600 text-white dark:text-black shadow-lg hover:shadow-xl focus:ring-gray-500',
+    outline: 'border-2 border-yellow-600 dark:border-yellow-500 text-yellow-600 dark:text-yellow-500 hover:bg-yellow-600 dark:hover:bg-yellow-500 hover:text-white dark:hover:text-black focus:ring-yellow-500',
+    ghost: 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-800 focus:ring-gray-500',
   };
 
   const sizes = {

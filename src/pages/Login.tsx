@@ -52,38 +52,38 @@ export const Login: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#0A0A0A] px-4 sm:px-6 lg:px-8 pt-16">
+    <div className="min-h-screen flex items-center justify-center bg-white dark:bg-[#0A0A0A] px-4 sm:px-6 lg:px-8 pt-16 transition-colors duration-300">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.8 }}
         className="max-w-md w-full"
       >
-        <div className="bg-gradient-to-br from-[#1A1A1A] via-[#0A0A0A] to-black border border-yellow-500/30 rounded-2xl shadow-2xl shadow-yellow-500/20 p-8">
+        <div className="bg-gradient-to-br from-gray-50 via-white to-gray-100 dark:from-[#1A1A1A] dark:via-[#0A0A0A] dark:to-black border border-gray-300/50 dark:border-yellow-500/30 rounded-2xl shadow-2xl shadow-gray-400/20 dark:shadow-yellow-500/20 p-8 transition-all duration-300">
           {/* Header */}
           <div className="text-center mb-8">
             <div className="flex items-center justify-center space-x-2 mb-4">
-              <div className="p-2 bg-gradient-to-r from-yellow-500 to-yellow-400 rounded-xl">
-                <Bot className="w-6 h-6 text-black" />
+              <div className="p-2 bg-gradient-to-r from-gray-800 to-gray-700 dark:from-yellow-500 dark:to-yellow-400 rounded-xl">
+                <Bot className="w-6 h-6 text-white dark:text-black" />
               </div>
-              <span className="text-xl font-bold bg-gradient-to-r from-yellow-400 to-yellow-500 bg-clip-text text-transparent">
+              <span className="text-xl font-bold bg-gradient-to-r from-gray-800 to-gray-700 dark:from-yellow-400 dark:to-yellow-500 bg-clip-text text-transparent">
                 PLUDO.AI
               </span>
             </div>
-            <h2 className="text-2xl font-bold text-white mb-2">
+            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
               Welcome Back
             </h2>
-            <p className="text-gray-400">
+            <p className="text-gray-600 dark:text-gray-400">
               Sign in to your account to continue building amazing AI agents
             </p>
           </div>
 
           {/* Database Warning */}
           {!isSupabaseConfigured() && (
-            <div className="mb-6 p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
+            <div className="mb-6 p-4 bg-yellow-50 dark:bg-yellow-500/10 border border-yellow-200 dark:border-yellow-500/30 rounded-lg">
               <div className="flex items-center">
-                <AlertCircle className="w-5 h-5 text-yellow-400 mr-2" />
-                <div className="text-sm text-yellow-200">
+                <AlertCircle className="w-5 h-5 text-yellow-600 dark:text-yellow-400 mr-2" />
+                <div className="text-sm text-yellow-800 dark:text-yellow-200">
                   <strong>Demo Mode:</strong> Database not configured. Authentication is disabled.
                 </div>
               </div>
@@ -119,7 +119,7 @@ export const Login: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-8 text-gray-400 hover:text-gray-300"
+                className="absolute right-3 top-8 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
                 disabled={!isSupabaseConfigured()}
               >
                 {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
@@ -130,16 +130,16 @@ export const Login: React.FC = () => {
               <label className="flex items-center">
                 <input
                   type="checkbox"
-                  className="w-4 h-4 text-yellow-500 bg-gray-800 border-gray-600 rounded focus:ring-yellow-500 focus:ring-2"
+                  className="w-4 h-4 text-yellow-500 bg-gray-100 dark:bg-gray-800 border-gray-300 dark:border-gray-600 rounded focus:ring-yellow-500 focus:ring-2"
                   disabled={!isSupabaseConfigured()}
                 />
-                <span className="ml-2 text-sm text-gray-400">
+                <span className="ml-2 text-sm text-gray-600 dark:text-gray-400">
                   Remember me
                 </span>
               </label>
               <Link
                 to="/forgot-password"
-                className="text-sm text-yellow-400 hover:text-yellow-300"
+                className="text-sm text-yellow-600 dark:text-yellow-400 hover:text-yellow-500 dark:hover:text-yellow-300"
               >
                 Forgot password?
               </Link>
@@ -149,8 +149,8 @@ export const Login: React.FC = () => {
               type="submit"
               className={`w-full py-4 text-lg font-black transition-all duration-300 rounded-xl ${
                 isSupabaseConfigured()
-                  ? 'bg-gradient-to-r from-yellow-500 to-yellow-400 hover:from-yellow-400 hover:to-yellow-300 text-black shadow-2xl shadow-yellow-500/40'
-                  : 'bg-gray-600 text-gray-400 cursor-not-allowed'
+                  ? 'bg-gradient-to-r from-gray-800 to-gray-700 dark:from-yellow-500 dark:to-yellow-400 hover:from-gray-700 hover:to-gray-600 dark:hover:from-yellow-400 dark:hover:to-yellow-300 text-white dark:text-black shadow-2xl shadow-gray-800/40 dark:shadow-yellow-500/40'
+                  : 'bg-gray-400 dark:bg-gray-600 text-gray-600 dark:text-gray-400 cursor-not-allowed'
               }`}
               loading={loading}
               disabled={!isSupabaseConfigured()}
@@ -161,11 +161,11 @@ export const Login: React.FC = () => {
 
           {/* Footer */}
           <div className="mt-6 text-center">
-            <p className="text-sm text-gray-400">
+            <p className="text-sm text-gray-600 dark:text-gray-400">
               Don't have an account?{' '}
               <Link
                 to="/signup"
-                className="font-medium text-yellow-400 hover:text-yellow-300"
+                className="font-medium text-yellow-600 dark:text-yellow-400 hover:text-yellow-500 dark:hover:text-yellow-300"
               >
                 Sign up for free
               </Link>

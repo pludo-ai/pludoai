@@ -22,10 +22,13 @@ export const Textarea: React.FC<TextareaProps> = ({
       <motion.textarea
         whileFocus={{ scale: 1.01 }}
         className={`
-          block w-full rounded-lg border border-gray-300 dark:border-gray-600 
+          block w-full rounded-lg border 
           bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm
           px-3 py-2 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400
-          focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 focus:outline-none
+          border-gray-300 dark:border-gray-600
+          focus:border-yellow-500 dark:focus:border-yellow-500 
+          focus:ring-2 focus:ring-yellow-500/20 dark:focus:ring-yellow-500/20 
+          focus:outline-none
           transition-all duration-200 resize-none
           ${className}
         `}

@@ -161,11 +161,11 @@ export const Dashboard: React.FC = () => {
 
   const getAgentStatus = (agent: Agent) => {
     if (agent.vercel_url && isPublicHostedUrl(agent.vercel_url)) {
-      return { status: 'live', color: 'bg-green-500/20 text-green-400 border-green-500/30' };
+      return { status: 'live', color: 'bg-green-100 dark:bg-green-500/20 text-green-800 dark:text-green-400 border-green-200 dark:border-green-500/30' };
     } else if (agent.github_repo) {
-      return { status: 'deploying', color: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30' };
+      return { status: 'deploying', color: 'bg-yellow-100 dark:bg-yellow-500/20 text-yellow-800 dark:text-yellow-400 border-yellow-200 dark:border-yellow-500/30' };
     } else {
-      return { status: 'pending', color: 'bg-gray-500/20 text-gray-400 border-gray-500/30' };
+      return { status: 'pending', color: 'bg-gray-100 dark:bg-gray-500/20 text-gray-800 dark:text-gray-400 border-gray-200 dark:border-gray-500/30' };
     }
   };
 
@@ -175,19 +175,19 @@ export const Dashboard: React.FC = () => {
         return (
           <div className="space-y-6">
             {/* Welcome Section */}
-            <div className="bg-gradient-to-br from-[#1A1A1A] via-[#0A0A0A] to-black border border-yellow-500/30 rounded-2xl shadow-2xl shadow-yellow-500/20 p-6 bg-gradient-to-r from-yellow-500/10 to-gray-400/10">
+            <div className="bg-gradient-to-br from-gray-50 via-white to-gray-100 dark:from-[#1A1A1A] dark:via-[#0A0A0A] dark:to-black border border-gray-300/50 dark:border-yellow-500/30 rounded-2xl shadow-2xl shadow-gray-400/20 dark:shadow-yellow-500/20 p-6 bg-gradient-to-r from-yellow-100 to-gray-100 dark:from-yellow-500/10 dark:to-gray-400/10 transition-all duration-300">
               <div className="flex items-center justify-between">
                 <div>
-                  <h2 className="text-2xl font-bold text-white mb-2">
+                  <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
                     Welcome back, {user?.user_metadata?.name || user?.email?.split('@')[0] || 'User'}!
                   </h2>
-                  <p className="text-gray-400">
+                  <p className="text-gray-600 dark:text-gray-400">
                     Manage your AI agents and track their performance
                   </p>
                 </div>
                 <div className="hidden md:block">
-                  <div className="w-16 h-16 bg-gradient-to-r from-yellow-500 to-yellow-400 rounded-full flex items-center justify-center">
-                    <Bot className="w-8 h-8 text-black" />
+                  <div className="w-16 h-16 bg-gradient-to-r from-gray-800 to-gray-700 dark:from-yellow-500 dark:to-yellow-400 rounded-full flex items-center justify-center">
+                    <Bot className="w-8 h-8 text-white dark:text-black" />
                   </div>
                 </div>
               </div>
@@ -195,48 +195,48 @@ export const Dashboard: React.FC = () => {
 
             {/* Quick Stats */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <div className="bg-gradient-to-br from-[#1A1A1A] via-[#0A0A0A] to-black border border-yellow-500/30 rounded-2xl shadow-2xl shadow-yellow-500/20 p-4">
-                <div className="text-2xl font-bold text-yellow-400">
+              <div className="bg-gradient-to-br from-gray-50 via-white to-gray-100 dark:from-[#1A1A1A] dark:via-[#0A0A0A] dark:to-black border border-gray-300/50 dark:border-yellow-500/30 rounded-2xl shadow-2xl shadow-gray-400/20 dark:shadow-yellow-500/20 p-4 transition-all duration-300">
+                <div className="text-2xl font-bold text-yellow-600 dark:text-yellow-400">
                   {agents.length}
                 </div>
-                <div className="text-sm text-gray-400">
+                <div className="text-sm text-gray-600 dark:text-gray-400">
                   Total Agents
                 </div>
               </div>
-              <div className="bg-gradient-to-br from-[#1A1A1A] via-[#0A0A0A] to-black border border-yellow-500/30 rounded-2xl shadow-2xl shadow-yellow-500/20 p-4">
-                <div className="text-2xl font-bold text-green-400">
+              <div className="bg-gradient-to-br from-gray-50 via-white to-gray-100 dark:from-[#1A1A1A] dark:via-[#0A0A0A] dark:to-black border border-gray-300/50 dark:border-yellow-500/30 rounded-2xl shadow-2xl shadow-gray-400/20 dark:shadow-yellow-500/20 p-4 transition-all duration-300">
+                <div className="text-2xl font-bold text-green-600 dark:text-green-400">
                   {agents.filter(a => a.vercel_url && isPublicHostedUrl(a.vercel_url)).length}
                 </div>
-                <div className="text-sm text-gray-400">
+                <div className="text-sm text-gray-600 dark:text-gray-400">
                   Live Agents
                 </div>
               </div>
-              <div className="bg-gradient-to-br from-[#1A1A1A] via-[#0A0A0A] to-black border border-yellow-500/30 rounded-2xl shadow-2xl shadow-yellow-500/20 p-4">
-                <div className="text-2xl font-bold text-yellow-400">
+              <div className="bg-gradient-to-br from-gray-50 via-white to-gray-100 dark:from-[#1A1A1A] dark:via-[#0A0A0A] dark:to-black border border-gray-300/50 dark:border-yellow-500/30 rounded-2xl shadow-2xl shadow-gray-400/20 dark:shadow-yellow-500/20 p-4 transition-all duration-300">
+                <div className="text-2xl font-bold text-yellow-600 dark:text-yellow-400">
                   {agents.filter(a => a.github_repo && (!a.vercel_url || !isPublicHostedUrl(a.vercel_url))).length}
                 </div>
-                <div className="text-sm text-gray-400">
+                <div className="text-sm text-gray-600 dark:text-gray-400">
                   Deploying
                 </div>
               </div>
-              <div className="bg-gradient-to-br from-[#1A1A1A] via-[#0A0A0A] to-black border border-yellow-500/30 rounded-2xl shadow-2xl shadow-yellow-500/20 p-4">
-                <div className="text-2xl font-bold text-green-400">
+              <div className="bg-gradient-to-br from-gray-50 via-white to-gray-100 dark:from-[#1A1A1A] dark:via-[#0A0A0A] dark:to-black border border-gray-300/50 dark:border-yellow-500/30 rounded-2xl shadow-2xl shadow-gray-400/20 dark:shadow-yellow-500/20 p-4 transition-all duration-300">
+                <div className="text-2xl font-bold text-green-600 dark:text-green-400">
                   100%
                 </div>
-                <div className="text-sm text-gray-400">
+                <div className="text-sm text-gray-600 dark:text-gray-400">
                   Uptime
                 </div>
               </div>
             </div>
 
             {/* Agents List */}
-            <div className="bg-gradient-to-br from-[#1A1A1A] via-[#0A0A0A] to-black border border-yellow-500/30 rounded-2xl shadow-2xl shadow-yellow-500/20 p-6">
+            <div className="bg-gradient-to-br from-gray-50 via-white to-gray-100 dark:from-[#1A1A1A] dark:via-[#0A0A0A] dark:to-black border border-gray-300/50 dark:border-yellow-500/30 rounded-2xl shadow-2xl shadow-gray-400/20 dark:shadow-yellow-500/20 p-6 transition-all duration-300">
               <div className="flex items-center justify-between mb-6">
-                <h3 className="text-lg font-semibold text-white">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
                   Your AI Agents
                 </h3>
                 <Button 
-                  className="flex items-center bg-gradient-to-r from-yellow-500 to-yellow-400 hover:from-yellow-400 hover:to-yellow-300 text-black font-bold"
+                  className="flex items-center bg-gradient-to-r from-gray-800 to-gray-700 dark:from-yellow-500 dark:to-yellow-400 hover:from-gray-700 hover:to-gray-600 dark:hover:from-yellow-400 dark:hover:to-yellow-300 text-white dark:text-black font-bold"
                   onClick={handleCreateAgent}
                 >
                   <Plus className="w-4 h-4 mr-2" />
@@ -247,13 +247,13 @@ export const Dashboard: React.FC = () => {
               {loading ? (
                 <div className="text-center py-8">
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-yellow-500 mx-auto"></div>
-                  <p className="text-gray-400 mt-2">Loading agents...</p>
+                  <p className="text-gray-500 dark:text-gray-400 mt-2">Loading agents...</p>
                 </div>
               ) : agents.length === 0 ? (
                 <div className="text-center py-8">
                   <Bot className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                  <p className="text-gray-400 mb-4">No agents created yet</p>
-                  <Button onClick={handleCreateAgent} className="bg-gradient-to-r from-yellow-500 to-yellow-400 hover:from-yellow-400 hover:to-yellow-300 text-black font-bold">
+                  <p className="text-gray-500 dark:text-gray-400 mb-4">No agents created yet</p>
+                  <Button onClick={handleCreateAgent} className="bg-gradient-to-r from-gray-800 to-gray-700 dark:from-yellow-500 dark:to-yellow-400 hover:from-gray-700 hover:to-gray-600 dark:hover:from-yellow-400 dark:hover:to-yellow-300 text-white dark:text-black font-bold">
                     Create Your First Agent
                   </Button>
                 </div>
@@ -267,17 +267,17 @@ export const Dashboard: React.FC = () => {
                     return (
                       <div
                         key={agent.id}
-                        className="flex items-center justify-between p-4 bg-gray-800/50 rounded-lg"
+                        className="flex items-center justify-between p-4 bg-gray-100 dark:bg-gray-800/50 rounded-lg"
                       >
                         <div className="flex items-center space-x-4">
-                          <div className="w-12 h-12 bg-gradient-to-r from-yellow-500 to-yellow-400 rounded-full flex items-center justify-center">
-                            <Bot className="w-6 h-6 text-black" />
+                          <div className="w-12 h-12 bg-gradient-to-r from-gray-800 to-gray-700 dark:from-yellow-500 dark:to-yellow-400 rounded-full flex items-center justify-center">
+                            <Bot className="w-6 h-6 text-white dark:text-black" />
                           </div>
                           <div>
-                            <div className="font-medium text-white">
+                            <div className="font-medium text-gray-900 dark:text-white">
                               {agent.name} - {agent.brand_name}
                             </div>
-                            <div className="text-sm text-gray-400">
+                            <div className="text-sm text-gray-500 dark:text-gray-400">
                               {agent.agent_type.replace('-', ' ')} • Created {new Date(agent.created_at).toLocaleDateString()}
                             </div>
                           </div>
@@ -303,7 +303,7 @@ export const Dashboard: React.FC = () => {
                               variant="outline"
                               size="sm"
                               onClick={() => handlePreview(agent.vercel_url!)}
-                              className="flex items-center text-yellow-400 border-yellow-500/30"
+                              className="flex items-center text-yellow-600 dark:text-yellow-400 border-yellow-300 dark:border-yellow-500/30"
                             >
                               <AlertCircle className="w-4 h-4 mr-1" />
                               Check Status
@@ -325,10 +325,10 @@ export const Dashboard: React.FC = () => {
                             size="sm"
                             onClick={() => handleDeleteAgent(agent)}
                             disabled={isDeleting}
-                            className="flex items-center text-red-400 border-red-500/30 hover:bg-red-500/10"
+                            className="flex items-center text-red-600 dark:text-red-400 border-red-300 dark:border-red-500/30 hover:bg-red-50 dark:hover:bg-red-500/10"
                           >
                             {isDeleting ? (
-                              <div className="w-4 h-4 border-2 border-red-400 border-t-transparent rounded-full animate-spin mr-1" />
+                              <div className="w-4 h-4 border-2 border-red-600 dark:border-red-400 border-t-transparent rounded-full animate-spin mr-1" />
                             ) : (
                               <Trash2 className="w-4 h-4 mr-1" />
                             )}
@@ -346,12 +346,12 @@ export const Dashboard: React.FC = () => {
 
       case 'settings':
         return (
-          <div className="bg-gradient-to-br from-[#1A1A1A] via-[#0A0A0A] to-black border border-yellow-500/30 rounded-2xl shadow-2xl shadow-yellow-500/20 p-6">
-            <h3 className="text-lg font-semibold text-white mb-6">
+          <div className="bg-gradient-to-br from-gray-50 via-white to-gray-100 dark:from-[#1A1A1A] dark:via-[#0A0A0A] dark:to-black border border-gray-300/50 dark:border-yellow-500/30 rounded-2xl shadow-2xl shadow-gray-400/20 dark:shadow-yellow-500/20 p-6 transition-all duration-300">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-6">
               Agent Settings
             </h3>
             <div className="space-y-4">
-              <p className="text-gray-400">
+              <p className="text-gray-600 dark:text-gray-400">
                 Agent configuration settings will be available here. You can update your agent's
                 information, personality, and behavior.
               </p>
@@ -365,20 +365,20 @@ export const Dashboard: React.FC = () => {
 
       case 'memory':
         return (
-          <div className="bg-gradient-to-br from-[#1A1A1A] via-[#0A0A0A] to-black border border-yellow-500/30 rounded-2xl shadow-2xl shadow-yellow-500/20 p-6">
-            <h3 className="text-lg font-semibold text-white mb-6">
+          <div className="bg-gradient-to-br from-gray-50 via-white to-gray-100 dark:from-[#1A1A1A] dark:via-[#0A0A0A] dark:to-black border border-gray-300/50 dark:border-yellow-500/30 rounded-2xl shadow-2xl shadow-gray-400/20 dark:shadow-yellow-500/20 p-6 transition-all duration-300">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-6">
               Memory Editor
             </h3>
             <div className="space-y-4">
-              <p className="text-gray-400">
+              <p className="text-gray-600 dark:text-gray-400">
                 Add or edit your agent's knowledge base. This information will be used to 
                 provide more accurate and personalized responses.
               </p>
               <textarea
-                className="w-full h-64 p-4 border border-gray-600 rounded-lg bg-gray-800 text-white"
+                className="w-full h-64 p-4 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
                 placeholder="Add knowledge entries here..."
               />
-              <Button className="bg-gradient-to-r from-yellow-500 to-yellow-400 hover:from-yellow-400 hover:to-yellow-300 text-black font-bold">
+              <Button className="bg-gradient-to-r from-gray-800 to-gray-700 dark:from-yellow-500 dark:to-yellow-400 hover:from-gray-700 hover:to-gray-600 dark:hover:from-yellow-400 dark:hover:to-yellow-300 text-white dark:text-black font-bold">
                 Update Knowledge Base
               </Button>
             </div>
@@ -387,8 +387,8 @@ export const Dashboard: React.FC = () => {
 
       case 'embed':
         return (
-          <div className="bg-gradient-to-br from-[#1A1A1A] via-[#0A0A0A] to-black border border-yellow-500/30 rounded-2xl shadow-2xl shadow-yellow-500/20 p-6">
-            <h3 className="text-lg font-semibold text-white mb-6">
+          <div className="bg-gradient-to-br from-gray-50 via-white to-gray-100 dark:from-[#1A1A1A] dark:via-[#0A0A0A] dark:to-black border border-gray-300/50 dark:border-yellow-500/30 rounded-2xl shadow-2xl shadow-gray-400/20 dark:shadow-yellow-500/20 p-6 transition-all duration-300">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-6">
               Embed Your Agent
             </h3>
             <div className="space-y-6">
@@ -403,11 +403,11 @@ export const Dashboard: React.FC = () => {
                   return (
                     <>
                       <div>
-                        <label className="block text-sm font-medium text-gray-300 mb-2">
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                           Embed Code for {agent.name}
                         </label>
                         <div className="relative">
-                          <pre className="bg-gray-800 p-4 rounded-lg text-sm font-mono overflow-x-auto text-gray-300">
+                          <pre className="bg-gray-100 dark:bg-gray-800 p-4 rounded-lg text-sm font-mono overflow-x-auto text-gray-900 dark:text-gray-300">
                             {embedCode}
                           </pre>
                           <Button
@@ -422,7 +422,7 @@ export const Dashboard: React.FC = () => {
                       </div>
 
                       <div>
-                        <label className="block text-sm font-medium text-gray-300 mb-2">
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                           Direct Link
                         </label>
                         <div className="flex items-center space-x-2">
@@ -430,7 +430,7 @@ export const Dashboard: React.FC = () => {
                             type="text"
                             value={agent.vercel_url}
                             readOnly
-                            className="flex-1 p-2 border border-gray-600 rounded-lg bg-gray-800 text-white"
+                            className="flex-1 p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-white"
                           />
                           <Button
                             variant="outline"
@@ -447,11 +447,11 @@ export const Dashboard: React.FC = () => {
                         </div>
                       </div>
 
-                      <div className="bg-blue-500/10 p-4 rounded-lg">
-                        <h4 className="font-medium text-blue-200 mb-2">
+                      <div className="bg-blue-50 dark:bg-blue-500/10 p-4 rounded-lg">
+                        <h4 className="font-medium text-blue-900 dark:text-blue-200 mb-2">
                           How to embed your agent:
                         </h4>
-                        <ol className="text-sm text-blue-300 space-y-1 list-decimal list-inside">
+                        <ol className="text-sm text-blue-800 dark:text-blue-300 space-y-1 list-decimal list-inside">
                           <li>Copy the embed code above</li>
                           <li>Paste it into your website&apos;s HTML, preferably before the closing body tag</li>
                           <li>Your AI agent will appear as a floating chat button</li>
@@ -464,11 +464,11 @@ export const Dashboard: React.FC = () => {
                   return (
                     <div className="text-center py-8">
                       <Globe className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                      <p className="text-gray-400 mb-4">No live agents available for embedding</p>
-                      <p className="text-sm text-gray-500 mb-4">
+                      <p className="text-gray-500 dark:text-gray-400 mb-4">No live agents available for embedding</p>
+                      <p className="text-sm text-gray-400 dark:text-gray-500 mb-4">
                         Agents must be successfully deployed and have a public URL to generate embed codes.
                       </p>
-                      <Button onClick={handleCreateAgent} className="bg-gradient-to-r from-yellow-500 to-yellow-400 hover:from-yellow-400 hover:to-yellow-300 text-black font-bold">
+                      <Button onClick={handleCreateAgent} className="bg-gradient-to-r from-gray-800 to-gray-700 dark:from-yellow-500 dark:to-yellow-400 hover:from-gray-700 hover:to-gray-600 dark:hover:from-yellow-400 dark:hover:to-yellow-300 text-white dark:text-black font-bold">
                         Create Your First Agent
                       </Button>
                     </div>
@@ -485,12 +485,12 @@ export const Dashboard: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#0A0A0A] pt-16">
+    <div className="min-h-screen bg-white dark:bg-[#0A0A0A] pt-16 transition-colors duration-300">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Sidebar Navigation */}
         <div className="flex flex-col lg:flex-row gap-8">
           <div className="w-full lg:w-64">
-            <div className="bg-gradient-to-br from-[#1A1A1A] via-[#0A0A0A] to-black border border-yellow-500/30 rounded-2xl shadow-2xl shadow-yellow-500/20 p-4">
+            <div className="bg-gradient-to-br from-gray-50 via-white to-gray-100 dark:from-[#1A1A1A] dark:via-[#0A0A0A] dark:to-black border border-gray-300/50 dark:border-yellow-500/30 rounded-2xl shadow-2xl shadow-gray-400/20 dark:shadow-yellow-500/20 p-4 transition-all duration-300">
               <nav className="space-y-2">
                 {tabs.map((tab) => (
                   <button
@@ -499,8 +499,8 @@ export const Dashboard: React.FC = () => {
                     className={`
                       w-full flex items-center space-x-3 px-3 py-2 rounded-lg text-left transition-colors
                       ${activeTab === tab.id
-                        ? 'bg-yellow-500/20 text-yellow-400'
-                        : 'text-gray-400 hover:bg-gray-800 hover:text-white'
+                        ? 'bg-yellow-100 dark:bg-yellow-500/20 text-yellow-700 dark:text-yellow-400'
+                        : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white'
                       }
                     `}
                   >
@@ -509,11 +509,11 @@ export const Dashboard: React.FC = () => {
                   </button>
                 ))}
                 
-                <hr className="my-4 border-gray-700" />
+                <hr className="my-4 border-gray-200 dark:border-gray-700" />
                 
                 <button
                   onClick={handleLogout}
-                  className="w-full flex items-center space-x-3 px-3 py-2 rounded-lg text-left transition-colors text-red-400 hover:bg-red-500/10"
+                  className="w-full flex items-center space-x-3 px-3 py-2 rounded-lg text-left transition-colors text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10"
                 >
                   <LogOut className="w-4 h-4" />
                   <span>Logout</span>
