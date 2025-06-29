@@ -81,7 +81,7 @@ export const Create: React.FC = () => {
     agentType: 'customer-support',
     roleDescription: '',
     services: [''],
-    primaryColor: '#3b82f6',
+    primaryColor: '#eab308', // yellow-500
     tone: 'professional',
     avatarUrl: '',
     officeHours: '',
@@ -398,13 +398,13 @@ export const Create: React.FC = () => {
   const getStepIcon = (status: DeploymentStep['status']) => {
     switch (status) {
       case 'loading':
-        return <div className="w-5 h-5 border-2 border-primary-600 border-t-transparent rounded-full animate-spin" />;
+        return <div className="w-5 h-5 border-2 border-yellow-500 border-t-transparent rounded-full animate-spin" />;
       case 'success':
-        return <CheckCircle className="w-5 h-5 text-green-600" />;
+        return <CheckCircle className="w-5 h-5 text-green-400" />;
       case 'error':
-        return <AlertCircle className="w-5 h-5 text-red-600" />;
+        return <AlertCircle className="w-5 h-5 text-red-400" />;
       default:
-        return <div className="w-5 h-5 border-2 border-gray-300 rounded-full" />;
+        return <div className="w-5 h-5 border-2 border-gray-600 rounded-full" />;
     }
   };
 
@@ -425,25 +425,25 @@ export const Create: React.FC = () => {
 
   if (!user) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
-        <Card className="p-8 text-center">
+      <div className="min-h-screen flex items-center justify-center bg-[#0A0A0A] pt-16">
+        <div className="bg-gradient-to-br from-[#1A1A1A] via-[#0A0A0A] to-black border border-yellow-500/30 rounded-2xl shadow-2xl shadow-yellow-500/20 p-8 text-center">
           <Bot className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-          <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+          <h2 className="text-xl font-semibold text-white mb-2">
             Sign In Required
           </h2>
-          <p className="text-gray-600 dark:text-gray-300 mb-6">
+          <p className="text-gray-400 mb-6">
             Please sign in to create your AI agent
           </p>
-          <Button onClick={() => navigate('/login')}>
+          <Button onClick={() => navigate('/login')} className="bg-gradient-to-r from-yellow-500 to-yellow-400 hover:from-yellow-400 hover:to-yellow-300 text-black font-bold">
             Sign In
           </Button>
-        </Card>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+    <div className="min-h-screen bg-[#0A0A0A] pt-16">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
         <div className="text-center mb-12">
@@ -452,13 +452,13 @@ export const Create: React.FC = () => {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8 }}
           >
-            <h1 className="text-4xl md:text-5xl font-bold text-gray-900 dark:text-white mb-4">
+            <h1 className="text-4xl md:text-5xl font-bold text-white mb-4">
               Create Your{' '}
-              <span className="bg-gradient-to-r from-primary-600 to-secondary-600 bg-clip-text text-transparent">
+              <span className="bg-gradient-to-r from-yellow-400 to-yellow-500 bg-clip-text text-transparent">
                 AI Agent
               </span>
             </h1>
-            <p className="text-xl text-gray-600 dark:text-gray-300 max-w-3xl mx-auto">
+            <p className="text-xl text-gray-400 max-w-3xl mx-auto">
               Design, customize, and deploy your intelligent AI assistant in minutes. 
               No coding required.
             </p>
@@ -474,12 +474,12 @@ export const Create: React.FC = () => {
               animate={{ opacity: 1, x: 0 }}
               transition={{ duration: 0.5 }}
             >
-              <Card className="p-8">
+              <div className="bg-gradient-to-br from-[#1A1A1A] via-[#0A0A0A] to-black border border-yellow-500/30 rounded-2xl shadow-2xl shadow-yellow-500/20 p-8">
                 <div className="flex items-center space-x-3 mb-6">
-                  <div className="p-2 bg-primary-100 dark:bg-primary-900/30 rounded-lg">
-                    <Bot className="w-6 h-6 text-primary-600 dark:text-primary-400" />
+                  <div className="p-2 bg-yellow-500/20 rounded-lg">
+                    <Bot className="w-6 h-6 text-yellow-400" />
                   </div>
-                  <h2 className="text-2xl font-semibold text-gray-900 dark:text-white">
+                  <h2 className="text-2xl font-semibold text-white">
                     Basic Information
                   </h2>
                 </div>
@@ -509,13 +509,13 @@ export const Create: React.FC = () => {
                   />
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    <label className="block text-sm font-medium text-gray-300 mb-1">
                       Agent Type
                     </label>
                     <select
                       value={formData.agentType}
                       onChange={(e) => handleInputChange('agentType', e.target.value)}
-                      className="block w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm px-3 py-2 text-gray-900 dark:text-white focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 focus:outline-none transition-all duration-200"
+                      className="block w-full rounded-lg border border-gray-600 bg-gray-800/80 backdrop-blur-sm px-3 py-2 text-white focus:border-yellow-500 focus:ring-2 focus:ring-yellow-500/20 focus:outline-none transition-all duration-200"
                     >
                       <option value="customer-support">Customer Support</option>
                       <option value="sales">Sales Assistant</option>
@@ -539,11 +539,11 @@ export const Create: React.FC = () => {
                 {/* Auto-generated Subdomain Display */}
                 {formData.subdomain && (
                   <div className="mt-6">
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    <label className="block text-sm font-medium text-gray-300 mb-2">
                       Generated Subdomain
                     </label>
-                    <div className="flex items-center space-x-2 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                      <code className="text-sm text-gray-600 dark:text-gray-300 flex-1">
+                    <div className="flex items-center space-x-2 p-3 bg-gray-800 rounded-lg">
+                      <code className="text-sm text-gray-300 flex-1">
                         {formData.subdomain}
                       </code>
                       <Button
@@ -554,12 +554,12 @@ export const Create: React.FC = () => {
                         <Copy className="w-4 h-4" />
                       </Button>
                     </div>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    <p className="text-xs text-gray-500 mt-1">
                       This unique identifier is automatically generated for your agent
                     </p>
                   </div>
                 )}
-              </Card>
+              </div>
             </motion.div>
 
             {/* API Configuration */}
@@ -568,12 +568,12 @@ export const Create: React.FC = () => {
               animate={{ opacity: 1, x: 0 }}
               transition={{ duration: 0.5, delay: 0.05 }}
             >
-              <Card className="p-8">
+              <div className="bg-gradient-to-br from-[#1A1A1A] via-[#0A0A0A] to-black border border-yellow-500/30 rounded-2xl shadow-2xl shadow-yellow-500/20 p-8">
                 <div className="flex items-center space-x-3 mb-6">
-                  <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
-                    <Key className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+                  <div className="p-2 bg-blue-500/20 rounded-lg">
+                    <Key className="w-6 h-6 text-blue-400" />
                   </div>
-                  <h2 className="text-2xl font-semibold text-gray-900 dark:text-white">
+                  <h2 className="text-2xl font-semibold text-white">
                     AI Configuration
                   </h2>
                 </div>
@@ -581,7 +581,7 @@ export const Create: React.FC = () => {
                 <div className="space-y-6">
                   {/* API Provider Selection */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+                    <label className="block text-sm font-medium text-gray-300 mb-3">
                       AI Provider
                     </label>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -590,8 +590,8 @@ export const Create: React.FC = () => {
                           key={provider.id}
                           className={`relative cursor-pointer rounded-lg border-2 p-4 transition-all ${
                             formData.apiProvider === provider.id
-                              ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20'
-                              : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
+                              ? 'border-yellow-500 bg-yellow-500/10'
+                              : 'border-gray-600 hover:border-gray-500'
                           }`}
                           onClick={() => handleInputChange('apiProvider', provider.id)}
                         >
@@ -602,13 +602,13 @@ export const Create: React.FC = () => {
                               value={provider.id}
                               checked={formData.apiProvider === provider.id}
                               onChange={() => handleInputChange('apiProvider', provider.id)}
-                              className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300"
+                              className="h-4 w-4 text-yellow-500 focus:ring-yellow-500 border-gray-600 bg-gray-800"
                             />
                             <div className="ml-3">
-                              <div className="text-sm font-medium text-gray-900 dark:text-white">
+                              <div className="text-sm font-medium text-white">
                                 {provider.name}
                               </div>
-                              <div className="text-xs text-gray-500 dark:text-gray-400">
+                              <div className="text-xs text-gray-400">
                                 {provider.description}
                               </div>
                             </div>
@@ -620,13 +620,13 @@ export const Create: React.FC = () => {
 
                   {/* Model Selection */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    <label className="block text-sm font-medium text-gray-300 mb-1">
                       AI Model
                     </label>
                     <select
                       value={formData.model}
                       onChange={(e) => handleInputChange('model', e.target.value)}
-                      className="block w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm px-3 py-2 text-gray-900 dark:text-white focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 focus:outline-none transition-all duration-200"
+                      className="block w-full rounded-lg border border-gray-600 bg-gray-800/80 backdrop-blur-sm px-3 py-2 text-white focus:border-yellow-500 focus:ring-2 focus:ring-yellow-500/20 focus:outline-none transition-all duration-200"
                     >
                       {getCurrentModels().map((model) => (
                         <option key={model.id} value={model.id}>
@@ -646,7 +646,7 @@ export const Create: React.FC = () => {
                         placeholder="e.g., anthropic/claude-3-opus, openai/gpt-4-turbo"
                         required
                       />
-                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                      <p className="text-xs text-gray-500 mt-1">
                         Enter the exact model name as it appears in the OpenRouter documentation
                       </p>
                     </div>
@@ -663,10 +663,10 @@ export const Create: React.FC = () => {
                       icon={<Shield className="w-5 h-5 text-gray-400" />}
                       required
                     />
-                    <div className="mt-2 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                    <div className="mt-2 p-3 bg-blue-500/10 rounded-lg">
                       <div className="flex items-start">
-                        <Shield className="w-4 h-4 text-blue-600 dark:text-blue-400 mt-0.5 mr-2 flex-shrink-0" />
-                        <div className="text-xs text-blue-800 dark:text-blue-200">
+                        <Shield className="w-4 h-4 text-blue-400 mt-0.5 mr-2 flex-shrink-0" />
+                        <div className="text-xs text-blue-200">
                           <strong>Secure:</strong> Your API key is encrypted and stored securely. It's only used to power your AI agent's conversations.
                           {formData.apiProvider === 'openrouter' && (
                             <div className="mt-1">
@@ -683,7 +683,7 @@ export const Create: React.FC = () => {
                     </div>
                   </div>
                 </div>
-              </Card>
+              </div>
             </motion.div>
 
             {/* Services */}
@@ -692,12 +692,12 @@ export const Create: React.FC = () => {
               animate={{ opacity: 1, x: 0 }}
               transition={{ duration: 0.5, delay: 0.1 }}
             >
-              <Card className="p-8">
+              <div className="bg-gradient-to-br from-[#1A1A1A] via-[#0A0A0A] to-black border border-yellow-500/30 rounded-2xl shadow-2xl shadow-yellow-500/20 p-8">
                 <div className="flex items-center space-x-3 mb-6">
-                  <div className="p-2 bg-secondary-100 dark:bg-secondary-900/30 rounded-lg">
-                    <Settings className="w-6 h-6 text-secondary-600 dark:text-secondary-400" />
+                  <div className="p-2 bg-green-500/20 rounded-lg">
+                    <Settings className="w-6 h-6 text-green-400" />
                   </div>
-                  <h2 className="text-2xl font-semibold text-gray-900 dark:text-white">
+                  <h2 className="text-2xl font-semibold text-white">
                     Services & Capabilities
                   </h2>
                 </div>
@@ -733,7 +733,7 @@ export const Create: React.FC = () => {
                     Add Service
                   </Button>
                 </div>
-              </Card>
+              </div>
             </motion.div>
 
             {/* FAQs */}
@@ -742,21 +742,21 @@ export const Create: React.FC = () => {
               animate={{ opacity: 1, x: 0 }}
               transition={{ duration: 0.5, delay: 0.2 }}
             >
-              <Card className="p-8">
+              <div className="bg-gradient-to-br from-[#1A1A1A] via-[#0A0A0A] to-black border border-yellow-500/30 rounded-2xl shadow-2xl shadow-yellow-500/20 p-8">
                 <div className="flex items-center space-x-3 mb-6">
-                  <div className="p-2 bg-accent-100 dark:bg-accent-900/30 rounded-lg">
-                    <MessageSquare className="w-6 h-6 text-accent-600 dark:text-accent-400" />
+                  <div className="p-2 bg-purple-500/20 rounded-lg">
+                    <MessageSquare className="w-6 h-6 text-purple-400" />
                   </div>
-                  <h2 className="text-2xl font-semibold text-gray-900 dark:text-white">
+                  <h2 className="text-2xl font-semibold text-white">
                     Frequently Asked Questions
                   </h2>
                 </div>
 
                 <div className="space-y-6">
                   {faqs.map((faq) => (
-                    <div key={faq.id} className="border border-gray-200 dark:border-gray-700 rounded-lg p-4">
+                    <div key={faq.id} className="border border-gray-700 rounded-lg p-4">
                       <div className="flex items-start justify-between mb-4">
-                        <h3 className="font-medium text-gray-900 dark:text-white">
+                        <h3 className="font-medium text-white">
                           FAQ #{faqs.findIndex(f => f.id === faq.id) + 1}
                         </h3>
                         {faqs.length > 1 && (
@@ -797,7 +797,7 @@ export const Create: React.FC = () => {
                     Add FAQ
                   </Button>
                 </div>
-              </Card>
+              </div>
             </motion.div>
 
             {/* Customization */}
@@ -806,19 +806,19 @@ export const Create: React.FC = () => {
               animate={{ opacity: 1, x: 0 }}
               transition={{ duration: 0.5, delay: 0.3 }}
             >
-              <Card className="p-8">
+              <div className="bg-gradient-to-br from-[#1A1A1A] via-[#0A0A0A] to-black border border-yellow-500/30 rounded-2xl shadow-2xl shadow-yellow-500/20 p-8">
                 <div className="flex items-center space-x-3 mb-6">
-                  <div className="p-2 bg-purple-100 dark:bg-purple-900/30 rounded-lg">
-                    <Palette className="w-6 h-6 text-purple-600 dark:text-purple-400" />
+                  <div className="p-2 bg-purple-500/20 rounded-lg">
+                    <Palette className="w-6 h-6 text-purple-400" />
                   </div>
-                  <h2 className="text-2xl font-semibold text-gray-900 dark:text-white">
+                  <h2 className="text-2xl font-semibold text-white">
                     Customization
                   </h2>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    <label className="block text-sm font-medium text-gray-300 mb-2">
                       Primary Color
                     </label>
                     <div className="flex items-center space-x-3">
@@ -826,25 +826,25 @@ export const Create: React.FC = () => {
                         type="color"
                         value={formData.primaryColor}
                         onChange={(e) => handleInputChange('primaryColor', e.target.value)}
-                        className="w-12 h-12 rounded-lg border border-gray-300 dark:border-gray-600 cursor-pointer"
+                        className="w-12 h-12 rounded-lg border border-gray-600 cursor-pointer"
                       />
                       <Input
                         value={formData.primaryColor}
                         onChange={(e) => handleInputChange('primaryColor', e.target.value)}
-                        placeholder="#3b82f6"
+                        placeholder="#eab308"
                         className="flex-1"
                       />
                     </div>
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    <label className="block text-sm font-medium text-gray-300 mb-1">
                       Personality Tone
                     </label>
                     <select
                       value={formData.tone}
                       onChange={(e) => handleInputChange('tone', e.target.value)}
-                      className="block w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm px-3 py-2 text-gray-900 dark:text-white focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 focus:outline-none transition-all duration-200"
+                      className="block w-full rounded-lg border border-gray-600 bg-gray-800/80 backdrop-blur-sm px-3 py-2 text-white focus:border-yellow-500 focus:ring-2 focus:ring-yellow-500/20 focus:outline-none transition-all duration-200"
                     >
                       <option value="professional">Professional</option>
                       <option value="friendly">Friendly</option>
@@ -877,25 +877,25 @@ export const Create: React.FC = () => {
                     rows={4}
                   />
                 </div>
-              </Card>
+              </div>
             </motion.div>
           </div>
 
           {/* Preview & Actions */}
           <div className="lg:col-span-1">
-            <div className="sticky top-8 space-y-6">
+            <div className="sticky top-24 space-y-6">
               {/* Preview */}
               <motion.div
                 initial={{ opacity: 0, x: 20 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ duration: 0.5 }}
               >
-                <Card className="p-6">
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+                <div className="bg-gradient-to-br from-[#1A1A1A] via-[#0A0A0A] to-black border border-yellow-500/30 rounded-2xl shadow-2xl shadow-yellow-500/20 p-6">
+                  <h3 className="text-lg font-semibold text-white mb-4">
                     Agent Preview
                   </h3>
                   
-                  <div className="bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-900 rounded-lg p-4 mb-4">
+                  <div className="bg-gradient-to-br from-gray-800 to-gray-900 rounded-lg p-4 mb-4">
                     <div className="flex items-center space-x-3 mb-3">
                       {formData.avatarUrl ? (
                         <img 
@@ -915,22 +915,22 @@ export const Create: React.FC = () => {
                         </div>
                       )}
                       <div>
-                        <div className="font-medium text-gray-900 dark:text-white">
+                        <div className="font-medium text-white">
                           {formData.name || 'Agent Name'}
                         </div>
-                        <div className="text-sm text-gray-500 dark:text-gray-400">
+                        <div className="text-sm text-gray-400">
                           {formData.brandName || 'Brand Name'}
                         </div>
                       </div>
                     </div>
                     
-                    <div className="bg-white dark:bg-gray-800 rounded-lg p-3 mb-3">
-                      <p className="text-sm text-gray-600 dark:text-gray-300">
+                    <div className="bg-gray-800 rounded-lg p-3 mb-3">
+                      <p className="text-sm text-gray-300">
                         {formData.roleDescription || 'Role description will appear here...'}
                       </p>
                     </div>
                     
-                    <div className="text-xs text-gray-500 dark:text-gray-400 space-y-1">
+                    <div className="text-xs text-gray-500 space-y-1">
                       <div>Tone: {formData.tone} • Type: {formData.agentType.replace('-', ' ')}</div>
                       <div>AI: {getCurrentProvider()?.name} • Model: {getCurrentModels().find(m => m.id === formData.model)?.name || (formData.model === 'custom' ? formData.customModel : formData.model)}</div>
                     </div>
@@ -940,7 +940,7 @@ export const Create: React.FC = () => {
                     <Button
                       onClick={handleGenerateCode}
                       disabled={isGenerateCodeDisabled}
-                      className="w-full"
+                      className="w-full bg-gradient-to-r from-yellow-500 to-yellow-400 hover:from-yellow-400 hover:to-yellow-300 text-black font-bold"
                       loading={buttonStates.generateCode}
                     >
                       <Code className="w-4 h-4 mr-2" />
@@ -982,7 +982,7 @@ export const Create: React.FC = () => {
                       </Button>
                     )}
                   </div>
-                </Card>
+                </div>
               </motion.div>
 
               {/* Deployment Progress */}
@@ -992,8 +992,8 @@ export const Create: React.FC = () => {
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.5 }}
                 >
-                  <Card className="p-6">
-                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+                  <div className="bg-gradient-to-br from-[#1A1A1A] via-[#0A0A0A] to-black border border-yellow-500/30 rounded-2xl shadow-2xl shadow-yellow-500/20 p-6">
+                    <h3 className="text-lg font-semibold text-white mb-4">
                       Deployment Progress
                     </h3>
                     
@@ -1004,14 +1004,14 @@ export const Create: React.FC = () => {
                             {getStepIcon(step.status)}
                           </div>
                           <div className="flex-1 min-w-0">
-                            <div className="text-sm font-medium text-gray-900 dark:text-white">
+                            <div className="text-sm font-medium text-white">
                               {step.title}
                             </div>
                             {step.message && (
                               <div className={`text-xs mt-1 ${
                                 step.status === 'error' 
-                                  ? 'text-red-600 dark:text-red-400' 
-                                  : 'text-gray-500 dark:text-gray-400'
+                                  ? 'text-red-400' 
+                                  : 'text-gray-400'
                               }`}>
                                 {step.message}
                               </div>
@@ -1023,17 +1023,17 @@ export const Create: React.FC = () => {
 
                     {/* Results */}
                     {deploymentResult && (
-                      <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
-                        <h4 className="font-medium text-gray-900 dark:text-white mb-3">
+                      <div className="mt-6 pt-6 border-t border-gray-700">
+                        <h4 className="font-medium text-white mb-3">
                           Deployment Results
                         </h4>
                         
                         <div className="space-y-3">
                           {deploymentResult.githubRepo && (
-                            <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                            <div className="flex items-center justify-between p-3 bg-gray-800 rounded-lg">
                               <div className="flex items-center space-x-2">
-                                <Server className="w-4 h-4 text-gray-600 dark:text-gray-400" />
-                                <span className="text-sm text-gray-600 dark:text-gray-300">
+                                <Server className="w-4 h-4 text-gray-400" />
+                                <span className="text-sm text-gray-300">
                                   Repository
                                 </span>
                               </div>
@@ -1050,10 +1050,10 @@ export const Create: React.FC = () => {
                           )}
 
                           {deploymentResult.vercelUrl && (
-                            <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                            <div className="flex items-center justify-between p-3 bg-gray-800 rounded-lg">
                               <div className="flex items-center space-x-2">
-                                <Globe className="w-4 h-4 text-gray-600 dark:text-gray-400" />
-                                <span className="text-sm text-gray-600 dark:text-gray-300">
+                                <Globe className="w-4 h-4 text-gray-400" />
+                                <span className="text-sm text-gray-300">
                                   Live URL
                                 </span>
                               </div>
@@ -1077,9 +1077,9 @@ export const Create: React.FC = () => {
                           )}
 
                           {deploymentResult.embedCode && (
-                            <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                            <div className="p-3 bg-gray-800 rounded-lg">
                               <div className="flex items-center justify-between mb-2">
-                                <span className="text-sm font-medium text-gray-600 dark:text-gray-300">
+                                <span className="text-sm font-medium text-gray-300">
                                   Embed Code
                                 </span>
                                 <Button
@@ -1090,7 +1090,7 @@ export const Create: React.FC = () => {
                                   <Copy className="w-4 h-4" />
                                 </Button>
                               </div>
-                              <code className="text-xs text-gray-500 dark:text-gray-400 break-all">
+                              <code className="text-xs text-gray-400 break-all">
                                 {deploymentResult.embedCode}
                               </code>
                             </div>
@@ -1098,7 +1098,7 @@ export const Create: React.FC = () => {
                         </div>
                       </div>
                     )}
-                  </Card>
+                  </div>
                 </motion.div>
               )}
             </div>
