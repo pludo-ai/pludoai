@@ -409,10 +409,10 @@ export const Landing: React.FC = () => {
   const pricingPlans = [
     {
       name: "Artisan",
-      price: "FREE",
+      price: "Free",
       description: "Begin your journey into AI excellence.",
       features: [
-        "1 Free Agent",
+        "1 Premium AI Agent",
         "2,500 conversations/month",
         "Luxury customization",
         "Priority support",
@@ -420,13 +420,11 @@ export const Landing: React.FC = () => {
       ],
       cta: "Begin Journey",
       popular: false,
-      accent: "gold",
-      isEnabled: true,
-      badge: "Beta Preview"
+      accent: "gold"
     },
     {
       name: "Virtuoso",
-      price: "Coming Soon",
+      price: "$99",
       description: "For discerning professionals who demand more.",
       features: [
         "10 Elite AI Agents",
@@ -438,14 +436,13 @@ export const Landing: React.FC = () => {
         "Custom branding",
         "Priority deployment"
       ],
-      cta: "Coming Soon",
+      cta: "Elevate Your Experience",
       popular: true,
-      accent: "platinum",
-      isEnabled: false
+      accent: "platinum"
     },
     {
       name: "Sovereign",
-      price: "Coming Soon",
+      price: "Custom",
       description: "For visionary enterprises building the future.",
       features: [
         "Unlimited AI Agents",
@@ -458,10 +455,9 @@ export const Landing: React.FC = () => {
         "Private cloud deployment",
         "24/7 white-glove support"
       ],
-      cta: "Coming Soon",
+      cta: "Request Consultation",
       popular: false,
-      accent: "gold",
-      isEnabled: false
+      accent: "gold"
     }
   ];
 
@@ -736,7 +732,7 @@ export const Landing: React.FC = () => {
       </section>
 
       {/* Premium Pricing Section */}
-      <section id="pricing" className={`py-20 md:py-32 relative overflow-hidden ${
+      <section className={`py-20 md:py-32 relative overflow-hidden ${
         isDark 
           ? 'bg-gradient-to-b from-[#0A0A0A] to-black' 
           : 'bg-gradient-to-b from-white to-gray-50'
@@ -775,7 +771,7 @@ export const Landing: React.FC = () => {
                     : isDark
                       ? 'bg-gradient-to-br from-[#1A1A1A] via-[#0A0A0A] to-black border border-gray-700/30 hover:border-yellow-500/50 shadow-xl shadow-yellow-500/10'
                       : 'bg-gradient-to-br from-white via-gray-50 to-gray-100 border border-gray-300/30 hover:border-gray-500/50 shadow-xl shadow-gray-400/10'
-                } ${!plan.isEnabled ? 'opacity-60' : ''}`}>
+                }`}>
 
                   {plan.popular && (
                     <div className="text-center mb-4">
@@ -788,14 +784,6 @@ export const Landing: React.FC = () => {
                       </span>
                     </div>
                   )}
-
-                  {plan.badge && (
-                    <div className="text-center mb-4">
-                      <span className="px-3 py-1 rounded-full text-xs font-bold bg-gradient-to-r from-yellow-500 to-yellow-400 text-black">
-                        {plan.badge}
-                      </span>
-                    </div>
-                  )}
                   
                   <div className="text-center mb-8">
                     <h3 className={`text-2xl font-black mb-3 tracking-wide ${
@@ -805,7 +793,7 @@ export const Landing: React.FC = () => {
                       isDark ? 'text-white' : 'text-gray-900'
                     }`}>
                       {plan.price}
-                      {plan.price !== 'FREE' && plan.price !== 'Coming Soon' && (
+                      {plan.price !== 'Free' && plan.price !== 'Custom' && (
                         <span className={`text-lg font-normal ${
                           isDark ? 'text-gray-400' : 'text-gray-600'
                         }`}>/month</span>
@@ -829,17 +817,14 @@ export const Landing: React.FC = () => {
 
                   <Button 
                     className={`w-full py-4 text-lg font-black transition-all duration-300 rounded-xl ${
-                      plan.isEnabled
-                        ? plan.popular
-                          ? isDark
-                            ? 'bg-gradient-to-r from-yellow-500 to-yellow-400 hover:from-yellow-400 hover:to-yellow-300 text-black shadow-2xl shadow-yellow-500/40'
-                            : 'bg-gradient-to-r from-gray-800 to-gray-700 hover:from-gray-700 hover:to-gray-600 text-white shadow-2xl shadow-gray-800/40'
-                          : isDark
-                            ? 'bg-gradient-to-r from-[#1A1A1A] to-gray-700 hover:from-gray-700 hover:to-[#1A1A1A] text-white border-2 border-yellow-500/30 hover:border-yellow-500 shadow-xl'
-                            : 'bg-gradient-to-r from-gray-100 to-gray-200 hover:from-gray-200 hover:to-gray-300 text-gray-900 border-2 border-gray-300/50 hover:border-gray-400 shadow-xl'
-                        : 'bg-gray-400 dark:bg-gray-600 text-gray-600 dark:text-gray-400 cursor-not-allowed'
+                      plan.popular
+                        ? isDark
+                          ? 'bg-gradient-to-r from-yellow-500 to-yellow-400 hover:from-yellow-400 hover:to-yellow-300 text-black shadow-2xl shadow-yellow-500/40'
+                          : 'bg-gradient-to-r from-gray-800 to-gray-700 hover:from-gray-700 hover:to-gray-600 text-white shadow-2xl shadow-gray-800/40'
+                        : isDark
+                          ? 'bg-gradient-to-r from-[#1A1A1A] to-gray-700 hover:from-gray-700 hover:to-[#1A1A1A] text-white border-2 border-yellow-500/30 hover:border-yellow-500 shadow-xl'
+                          : 'bg-gradient-to-r from-gray-100 to-gray-200 hover:from-gray-200 hover:to-gray-300 text-gray-900 border-2 border-gray-300/50 hover:border-gray-400 shadow-xl'
                     }`}
-                    disabled={!plan.isEnabled}
                   >
                     {plan.cta}
                   </Button>
