@@ -592,5 +592,3 @@ export function HeroGeometric({
         </>
     );
 }
-
-export { HeroGeometric }
