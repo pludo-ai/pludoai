@@ -10,6 +10,7 @@ import {
   Minus, 
   Upload,
   Eye,
+  EyeOff,
   Code,
   Rocket,
   CheckCircle,
@@ -31,7 +32,7 @@ import { Textarea } from '../components/ui/Textarea';
 import { Card } from '../components/ui/Card';
 import { useAuthStore } from '../store/authStore';
 import { generateAgentCode, uploadToGitHub, deployToVercel, triggerDeploymentWithFile } from '../lib/deployment';
-import { isPublicHostedUrl } from '../utils/url';
+import { validateSubdomain, generateSubdomainFromBrand } from '../lib/subdomain';
 import toast from 'react-hot-toast';
 
 interface Agent {
@@ -62,16 +63,6 @@ interface DeploymentStep {
   message?: string;
 }
 
-interface DeploymentResult {
-  success: boolean;
-  agentId?: string;
-  githubRepo?: string;
-  vercelUrl?: string;
-  embedCode?: string;
-  files?: { path: string; content: string }[];
-  error?: string;
-}
-
 export const Create: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuthStore();
@@ -95,9 +86,24 @@ export const Create: React.FC = () => {
     subdomain: '',
     // New API configuration fields
     apiProvider: 'openrouter',
-    apiKey: '',
+    apiKey: '', // Empty by default
     model: 'deepseek/deepseek-r1',
     customModel: ''
+  });
+
+  // API key visibility state
+  const [showApiKey, setShowApiKey] = useState(false);
+
+  // Subdomain validation state
+  const [subdomainValidation, setSubdomainValidation] = useState<{
+    isValid: boolean;
+    isAvailable: boolean;
+    error?: string;
+    isChecking: boolean;
+  }>({
+    isValid: false,
+    isAvailable: false,
+    isChecking: false
   });
 
   // Deployment state
@@ -108,7 +114,7 @@ export const Create: React.FC = () => {
   ]);
 
   const [currentAgentId, setCurrentAgentId] = useState<string | null>(null);
-  const [deploymentResult, setDeploymentResult] = useState<DeploymentResult | null>(null);
+  const [deploymentResult, setDeploymentResult] = useState<any>(null);
   const [isDeploying, setIsDeploying] = useState(false);
   const [showDeployment, setShowDeployment] = useState(false);
   
@@ -119,6 +125,10 @@ export const Create: React.FC = () => {
     deployCloud: false,
     makeItLive: false,
   });
+
+  // Countdown state for trigger button
+  const [triggerCountdown, setTriggerCountdown] = useState(0);
+  const [deployCloudClickTime, setDeployCloudClickTime] = useState<number | null>(null);
 
   // API Provider options
   const apiProviders = [
@@ -149,11 +159,18 @@ export const Create: React.FC = () => {
 
   // Auto-generate subdomain from brand name
   useEffect(() => {
-    if (formData.brandName) {
-      const newSubdomain = generateSubdomain(formData.brandName);
+    if (formData.brandName && !formData.subdomain) {
+      const newSubdomain = generateSubdomainFromBrand(formData.brandName);
       setFormData(prev => ({ ...prev, subdomain: newSubdomain }));
     }
   }, [formData.brandName]);
+
+  // Validate subdomain when it changes
+  useEffect(() => {
+    if (formData.subdomain) {
+      validateSubdomainAsync(formData.subdomain);
+    }
+  }, [formData.subdomain]);
 
   // Update available models when API provider changes
   useEffect(() => {
@@ -162,6 +179,58 @@ export const Create: React.FC = () => {
       setFormData(prev => ({ ...prev, model: provider.models[0].id }));
     }
   }, [formData.apiProvider]);
+
+  // Countdown effect for trigger button
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    
+    if (deployCloudClickTime && triggerCountdown > 0) {
+      interval = setInterval(() => {
+        setTriggerCountdown(prev => {
+          if (prev <= 1) {
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    }
+
+    return () => {
+      if (interval) {
+        clearInterval(interval);
+      }
+    };
+  }, [deployCloudClickTime, triggerCountdown]);
+
+  const validateSubdomainAsync = async (subdomain: string) => {
+    if (!subdomain) {
+      setSubdomainValidation({
+        isValid: false,
+        isAvailable: false,
+        isChecking: false
+      });
+      return;
+    }
+
+    setSubdomainValidation(prev => ({ ...prev, isChecking: true }));
+
+    try {
+      const result = await validateSubdomain(subdomain);
+      setSubdomainValidation({
+        isValid: result.isValid,
+        isAvailable: result.isAvailable,
+        error: result.error,
+        isChecking: false
+      });
+    } catch (error) {
+      setSubdomainValidation({
+        isValid: false,
+        isAvailable: false,
+        error: 'Failed to validate subdomain',
+        isChecking: false
+      });
+    }
+  };
 
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -251,6 +320,14 @@ export const Create: React.FC = () => {
       toast.error('At least one service is required');
       return false;
     }
+    if (!formData.subdomain.trim()) {
+      toast.error('Subdomain is required');
+      return false;
+    }
+    if (!subdomainValidation.isValid || !subdomainValidation.isAvailable) {
+      toast.error('Please choose a valid and available subdomain');
+      return false;
+    }
     if (!formData.apiKey.trim()) {
       toast.error('API key is required');
       return false;
@@ -277,15 +354,11 @@ export const Create: React.FC = () => {
     try {
       updateDeploymentStep('step-1', 'loading', 'Generating agent code...');
 
-      // Ensure subdomain is generated if not already
-      const finalSubdomain = formData.subdomain || generateSubdomain(formData.brandName);
-
       // Use custom model if selected
       const finalModel = formData.model === 'custom' ? formData.customModel : formData.model;
 
       const config = {
         ...formData,
-        subdomain: finalSubdomain,
         model: finalModel,
         services: formData.services.filter(s => s.trim()),
         faqs: formData.faqs.filter(faq => faq.question.trim() && faq.answer.trim()),
@@ -351,6 +424,10 @@ export const Create: React.FC = () => {
 
     setIsDeploying(true);
     setButtonLoading('deployCloud', true);
+    
+    // Start countdown for trigger button
+    setDeployCloudClickTime(Date.now());
+    setTriggerCountdown(30);
 
     try {
       updateDeploymentStep('step-3', 'loading', 'Deploying to cloud...');
@@ -361,29 +438,9 @@ export const Create: React.FC = () => {
         updateDeploymentStep('step-3', 'success', 'Deployed to cloud successfully');
         setDeploymentResult(prev => ({ ...prev, ...result }));
         toast.success('Agent deployed successfully!');
-        
-        // If deployment is pending, show trigger button after 45 seconds
-        if (!result.vercelUrl || !isPublicHostedUrl(result.vercelUrl)) {
-          setTimeout(() => {
-            setButtonStates(prev => ({ ...prev, makeItLive: true }));
-            toast.error('Auto deploy having trouble, trigger it manually', {
-              icon: '🚀',
-              duration: 5000
-            });
-          }, 45000);
-        }
       } else {
         updateDeploymentStep('step-3', 'error', result.error);
         toast.error('Failed to deploy to cloud');
-        
-        // Show trigger button if deployment is pending
-        if (result.vercelUrl && !isPublicHostedUrl(result.vercelUrl)) {
-          setButtonStates(prev => ({ ...prev, makeItLive: true }));
-          toast.error('Auto deploy having trouble, trigger it manually', {
-            icon: '🚀',
-            duration: 5000
-          });
-        }
       }
     } catch (error: any) {
       updateDeploymentStep('step-3', 'error', error.message);
@@ -429,15 +486,6 @@ export const Create: React.FC = () => {
     toast.success('Copied to clipboard!');
   };
 
-  // Helper function to generate a unique subdomain
-  const generateSubdomain = (brandName: string): string => {
-    const cleanBrandName = brandName.toLowerCase().replace(/[^a-z0-9]/g, '-').substring(0, 20);
-    const userSuffix = user?.id.slice(-4) || Math.random().toString(36).substr(2, 4);
-    const randomSuffix = Math.random().toString(36).substr(2, 4);
-    const timestamp = Date.now().toString().slice(-6);
-    return `${cleanBrandName}-ai-agent-${userSuffix}-${randomSuffix}-${timestamp}`;
-  };
-
   const getStepIcon = (status: DeploymentStep['status']) => {
     switch (status) {
       case 'loading':
@@ -460,11 +508,24 @@ export const Create: React.FC = () => {
     return provider ? provider.models : [];
   };
 
+  const getSubdomainIcon = () => {
+    if (subdomainValidation.isChecking) {
+      return <div className="w-4 h-4 border-2 border-yellow-500 border-t-transparent rounded-full animate-spin" />;
+    }
+    if (subdomainValidation.isValid && subdomainValidation.isAvailable) {
+      return <CheckCircle className="w-4 h-4 text-green-600" />;
+    }
+    if (subdomainValidation.error) {
+      return <AlertCircle className="w-4 h-4 text-red-600" />;
+    }
+    return null;
+  };
+
   // Check if buttons should be disabled
   const isGenerateCodeDisabled = buttonStates.generateCode || isDeploying;
   const isUploadRepoDisabled = buttonStates.uploadRepo || isDeploying || deploymentSteps[0]?.status !== 'success';
   const isDeployCloudDisabled = buttonStates.deployCloud || isDeploying || deploymentSteps[1]?.status !== 'success';
-  const isMakeItLiveDisabled = buttonStates.makeItLive || !deploymentResult;
+  const isMakeItLiveDisabled = buttonStates.makeItLive || !deploymentResult?.githubRepo || triggerCountdown > 0;
 
   if (!user) {
     return (
@@ -587,29 +648,43 @@ export const Create: React.FC = () => {
                   />
                 </div>
 
-                {/* Auto-generated Subdomain Display */}
-                {formData.subdomain && (
-                  <div className="mt-6">
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                      Generated Subdomain
-                    </label>
-                    <div className="flex items-center space-x-2 p-3 bg-gray-100 dark:bg-gray-800 rounded-lg">
-                      <code className="text-sm text-gray-600 dark:text-gray-300 flex-1">
-                        {formData.subdomain}
-                      </code>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => copyToClipboard(formData.subdomain)}
-                      >
-                        <Copy className="w-4 h-4" />
-                      </Button>
+                {/* Subdomain Input */}
+                <div className="mt-6">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Choose Your Subdomain *
+                  </label>
+                  <div className="flex items-center space-x-2">
+                    <div className="flex-1 relative">
+                      <input
+                        type="text"
+                        value={formData.subdomain}
+                        onChange={(e) => handleInputChange('subdomain', e.target.value.toLowerCase())}
+                        placeholder="your-business"
+                        className="block w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm px-3 py-2 pr-10 text-gray-900 dark:text-white focus:border-yellow-500 focus:ring-2 focus:ring-yellow-500/20 focus:outline-none transition-all duration-200"
+                        required
+                      />
+                      <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                        {getSubdomainIcon()}
+                      </div>
                     </div>
-                    <p className="text-xs text-gray-500 mt-1">
-                      This unique identifier is automatically generated for your agent
-                    </p>
+                    <span className="text-gray-600 dark:text-gray-400 font-medium">
+                      .pludo.online
+                    </span>
                   </div>
-                )}
+                  {subdomainValidation.error && (
+                    <p className="text-sm text-red-600 dark:text-red-400 mt-1">
+                      {subdomainValidation.error}
+                    </p>
+                  )}
+                  {subdomainValidation.isValid && subdomainValidation.isAvailable && (
+                    <p className="text-sm text-green-600 dark:text-green-400 mt-1">
+                      ✓ Subdomain is available
+                    </p>
+                  )}
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    Your agent will be accessible at: {formData.subdomain || 'your-subdomain'}.pludo.online
+                  </p>
+                </div>
               </div>
             </motion.div>
 
@@ -703,17 +778,31 @@ export const Create: React.FC = () => {
                     </div>
                   )}
 
-                  {/* API Key Input */}
+                  {/* API Key Input with visibility toggle */}
                   <div>
-                    <Input
-                      label={`${getCurrentProvider()?.name} API Key`}
-                      type="password"
-                      value={formData.apiKey}
-                      onChange={(e) => handleInputChange('apiKey', e.target.value)}
-                      placeholder={`Enter your ${getCurrentProvider()?.name} API key`}
-                      icon={<Shield className="w-5 h-5 text-gray-400" />}
-                      required
-                    />
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      {getCurrentProvider()?.name} API Key *
+                    </label>
+                    <div className="relative">
+                      <input
+                        type={showApiKey ? 'text' : 'password'}
+                        value={formData.apiKey}
+                        onChange={(e) => handleInputChange('apiKey', e.target.value)}
+                        placeholder={`Enter your ${getCurrentProvider()?.name} API key`}
+                        className="block w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm px-3 py-2 pr-20 text-gray-900 dark:text-white focus:border-yellow-500 focus:ring-2 focus:ring-yellow-500/20 focus:outline-none transition-all duration-200"
+                        required
+                      />
+                      <div className="absolute right-3 top-1/2 transform -translate-y-1/2 flex items-center space-x-2">
+                        <Shield className="w-4 h-4 text-gray-400" />
+                        <button
+                          type="button"
+                          onClick={() => setShowApiKey(!showApiKey)}
+                          className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                        >
+                          {showApiKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        </button>
+                      </div>
+                    </div>
                     <div className="mt-2 p-3 bg-blue-50 dark:bg-blue-500/10 rounded-lg">
                       <div className="flex items-start">
                         <Shield className="w-4 h-4 text-blue-600 dark:text-blue-400 mt-0.5 mr-2 flex-shrink-0" />
@@ -988,6 +1077,12 @@ export const Create: React.FC = () => {
                     <div className="text-xs text-gray-500 space-y-1">
                       <div>Tone: {formData.tone} • Type: {formData.agentType.replace('-', ' ')}</div>
                       <div>AI: {getCurrentProvider()?.name} • Model: {getCurrentModels().find(m => m.id === formData.model)?.name || (formData.model === 'custom' ? formData.customModel : formData.model)}</div>
+                      {formData.subdomain && (
+                        <div className="flex items-center space-x-1">
+                          <Globe className="w-3 h-3" />
+                          <span>{formData.subdomain}.pludo.online</span>
+                        </div>
+                      )}
                     </div>
                   </div>
 
@@ -1024,8 +1119,8 @@ export const Create: React.FC = () => {
                       Deploy to Cloud
                     </Button>
 
-                    {/* Make it Live Button */}
-                    {deploymentResult && (
+                    {/* Make it Live Button with countdown */}
+                    {deploymentResult?.githubRepo && (
                       <Button
                         onClick={handleMakeItLive}
                         disabled={isMakeItLiveDisabled}
@@ -1033,7 +1128,7 @@ export const Create: React.FC = () => {
                         loading={buttonStates.makeItLive}
                       >
                         <Zap className="w-4 h-4 mr-2" />
-                        Trigger Deployment
+                        {triggerCountdown > 0 ? `Trigger Deployment (${triggerCountdown}s)` : 'Trigger Deployment'}
                       </Button>
                     )}
                   </div>
@@ -1084,6 +1179,26 @@ export const Create: React.FC = () => {
                         </h4>
                         
                         <div className="space-y-3">
+                          {deploymentResult.githubRepo && (
+                            <div className="flex items-center justify-between p-3 bg-gray-100 dark:bg-gray-800 rounded-lg">
+                              <div className="flex items-center space-x-2">
+                                <Github className="w-4 h-4 text-gray-600 dark:text-gray-400" />
+                                <span className="text-sm text-gray-600 dark:text-gray-300">
+                                  Repository
+                                </span>
+                              </div>
+                              <div className="flex items-center space-x-2">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => window.open(deploymentResult.githubRepo, '_blank')}
+                                >
+                                  <ExternalLink className="w-4 h-4" />
+                                </Button>
+                              </div>
+                            </div>
+                          )}
+
                           {deploymentResult.vercelUrl && (
                             <div className="flex items-center justify-between p-3 bg-gray-100 dark:bg-gray-800 rounded-lg">
                               <div className="flex items-center space-x-2">
@@ -1096,14 +1211,14 @@ export const Create: React.FC = () => {
                                 <Button
                                   variant="ghost"
                                   size="sm"
-                                  onClick={() => window.open(deploymentResult.vercelUrl!, '_blank')}
+                                  onClick={() => window.open(deploymentResult.vercelUrl, '_blank')}
                                 >
                                   <Eye className="w-4 h-4" />
                                 </Button>
                                 <Button
                                   variant="ghost"
                                   size="sm"
-                                  onClick={() => copyToClipboard(deploymentResult.vercelUrl!)}
+                                  onClick={() => copyToClipboard(deploymentResult.vercelUrl)}
                                 >
                                   <Copy className="w-4 h-4" />
                                 </Button>
@@ -1120,7 +1235,7 @@ export const Create: React.FC = () => {
                                 <Button
                                   variant="ghost"
                                   size="sm"
-                                  onClick={() => copyToClipboard(deploymentResult.embedCode!)}
+                                  onClick={() => copyToClipboard(deploymentResult.embedCode)}
                                 >
                                   <Copy className="w-4 h-4" />
                                 </Button>
