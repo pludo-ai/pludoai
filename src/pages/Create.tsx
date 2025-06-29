@@ -10,6 +10,7 @@ import {
   Minus, 
   Upload,
   Eye,
+  EyeOff,
   Code,
   Rocket,
   CheckCircle,
@@ -24,9 +25,7 @@ import {
   Shield,
   Server,
   Cloud,
-  EyeOff,
-  Save,
-  Edit
+  RefreshCw
 } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
@@ -34,7 +33,7 @@ import { Textarea } from '../components/ui/Textarea';
 import { Card } from '../components/ui/Card';
 import { useAuthStore } from '../store/authStore';
 import { generateAgentCode, uploadToGitHub, deployToVercel, triggerDeploymentWithFile, regenerateAgent } from '../lib/deployment';
-import { validateSubdomain } from '../lib/subdomain';
+import { validateSubdomain, generateSubdomainFromBrand, constructPludoUrl } from '../lib/subdomain';
 import { supabase } from '../lib/supabase';
 import toast from 'react-hot-toast';
 
@@ -97,22 +96,24 @@ export const Create: React.FC = () => {
     customModel: ''
   });
 
-  // Loading states
-  const [loadingAgent, setLoadingAgent] = useState(false);
-  const [subdomainChecking, setSubdomainChecking] = useState(false);
-  const [subdomainError, setSubdomainError] = useState('');
+  // Original form data for change detection
+  const [originalFormData, setOriginalFormData] = useState<Agent | null>(null);
 
   // Deployment state
   const [deploymentSteps, setDeploymentSteps] = useState<DeploymentStep[]>([
-    { id: 'step-1', title: isEditMode ? 'Update Agent Code' : 'Generate Agent Code', status: 'pending' },
-    { id: 'step-2', title: isEditMode ? 'Update Repository' : 'Upload to Repository', status: 'pending' },
+    { id: 'step-1', title: 'Generate Agent Code', status: 'pending' },
+    { id: 'step-2', title: 'Upload to Repository', status: 'pending' },
     { id: 'step-3', title: 'Deploy to Cloud', status: 'pending' },
   ]);
 
-  const [currentAgentId, setCurrentAgentId] = useState<string | null>(editAgentId);
+  const [currentAgentId, setCurrentAgentId] = useState<string | null>(null);
   const [deploymentResult, setDeploymentResult] = useState<any>(null);
   const [isDeploying, setIsDeploying] = useState(false);
   const [showDeployment, setShowDeployment] = useState(false);
+  const [showApiKey, setShowApiKey] = useState(false);
+  const [subdomainValidation, setSubdomainValidation] = useState<{ isValid: boolean; isAvailable: boolean; error?: string }>({ isValid: true, isAvailable: true });
+  const [isValidatingSubdomain, setIsValidatingSubdomain] = useState(false);
+  const [countdownSeconds, setCountdownSeconds] = useState(0);
   
   // Button states
   const [buttonStates, setButtonStates] = useState({
@@ -120,14 +121,8 @@ export const Create: React.FC = () => {
     uploadRepo: false,
     deployCloud: false,
     makeItLive: false,
+    updateAgent: false,
   });
-
-  // API key visibility
-  const [showApiKey, setShowApiKey] = useState(false);
-
-  // Countdown for trigger button
-  const [triggerCountdown, setTriggerCountdown] = useState(0);
-  const [deployCloudClickTime, setDeployCloudClickTime] = useState<number | null>(null);
 
   // API Provider options
   const apiProviders = [
@@ -163,105 +158,108 @@ export const Create: React.FC = () => {
     }
   }, [isEditMode, editAgentId, user]);
 
+  // Auto-generate subdomain from brand name (only for new agents)
+  useEffect(() => {
+    if (!isEditMode && formData.brandName && !formData.subdomain) {
+      const newSubdomain = generateSubdomainFromBrand(formData.brandName);
+      setFormData(prev => ({ ...prev, subdomain: newSubdomain }));
+    }
+  }, [formData.brandName, isEditMode]);
+
   // Update available models when API provider changes
   useEffect(() => {
     const provider = apiProviders.find(p => p.id === formData.apiProvider);
-    if (provider && provider.models.length > 0 && !isEditMode) {
+    if (provider && provider.models.length > 0 && formData.model !== 'custom') {
       setFormData(prev => ({ ...prev, model: provider.models[0].id }));
     }
-  }, [formData.apiProvider, isEditMode]);
+  }, [formData.apiProvider]);
 
-  // Countdown effect for trigger button
+  // Validate subdomain when it changes (only for new agents)
   useEffect(() => {
-    if (triggerCountdown > 0) {
-      const timer = setTimeout(() => {
-        setTriggerCountdown(prev => prev - 1);
-      }, 1000);
-      return () => clearTimeout(timer);
+    if (!isEditMode && formData.subdomain) {
+      validateSubdomainAsync(formData.subdomain);
     }
-  }, [triggerCountdown]);
+  }, [formData.subdomain, isEditMode]);
 
   const loadAgentForEdit = async (agentId: string) => {
-    setLoadingAgent(true);
     try {
       const { data: agent, error } = await supabase
         .from('agents')
         .select('*')
         .eq('id', agentId)
-        .eq('user_id', user!.id)
+        .eq('user_id', user?.id)
         .single();
 
       if (error) throw error;
 
-      if (agent) {
-        setFormData({
-          name: agent.name,
-          brandName: agent.brand_name,
-          websiteName: agent.website_name || '',
-          agentType: agent.agent_type,
-          roleDescription: agent.role_description,
-          services: agent.services.length > 0 ? agent.services : [''],
-          faqs: agent.faqs.length > 0 ? agent.faqs.map((faq: any, index: number) => ({
-            ...faq,
-            id: faq.id || `faq-${index}-${Math.random().toString(36).substr(2, 8)}`
-          })) : [{ id: `faq-${Math.random().toString(36).substr(2, 8)}`, question: '', answer: '' }],
-          primaryColor: agent.primary_color,
-          tone: agent.tone,
-          avatarUrl: agent.avatar_url || '',
-          officeHours: agent.office_hours || '',
-          knowledge: agent.knowledge || '',
-          subdomain: agent.subdomain,
-          apiProvider: agent.api_provider || 'openrouter',
-          apiKey: agent.api_key || '',
-          model: agent.model || 'deepseek/deepseek-r1',
-          customModel: ''
-        });
-
-        // Set deployment result if agent has URLs
-        if (agent.github_repo || agent.vercel_url) {
-          setDeploymentResult({
-            agentId: agent.id,
-            githubRepo: agent.github_repo,
-            vercelUrl: agent.vercel_url,
-            embedCode: agent.vercel_url ? `<!-- ${agent.brand_name} AI Assistant - Generated by PLUDO.AI -->
-<script src="${agent.vercel_url}/widget.js" defer></script>` : undefined
-          });
-        }
+      if (!agent) {
+        toast.error('Agent not found or you do not have permission to edit it');
+        navigate('/dashboard');
+        return;
       }
+
+      const loadedFormData: Agent = {
+        name: agent.name,
+        brandName: agent.brand_name,
+        websiteName: agent.website_name || '',
+        agentType: agent.agent_type,
+        roleDescription: agent.role_description,
+        services: agent.services || [''],
+        faqs: agent.faqs?.length > 0 ? agent.faqs.map((faq: any, index: number) => ({
+          ...faq,
+          id: faq.id || `faq-${index}-${Math.random().toString(36).substr(2, 8)}`
+        })) : [{ id: `faq-${Math.random().toString(36).substr(2, 8)}`, question: '', answer: '' }],
+        primaryColor: agent.primary_color,
+        tone: agent.tone,
+        avatarUrl: agent.avatar_url || '',
+        officeHours: agent.office_hours || '',
+        knowledge: agent.knowledge || '',
+        subdomain: agent.subdomain,
+        apiProvider: agent.api_provider || 'openrouter',
+        apiKey: agent.api_key || '',
+        model: agent.model || 'deepseek/deepseek-r1',
+        customModel: ''
+      };
+
+      setFormData(loadedFormData);
+      setOriginalFormData(loadedFormData);
+      setCurrentAgentId(agentId);
+
+      // Set deployment result if agent has URLs
+      if (agent.github_repo || agent.vercel_url) {
+        setDeploymentResult({
+          agentId: agentId,
+          githubRepo: agent.github_repo,
+          vercelUrl: agent.vercel_url || constructPludoUrl(agent.subdomain),
+          embedCode: agent.vercel_url ? `<!-- ${agent.brand_name} AI Assistant - Generated by PLUDO.AI -->
+<script src="${agent.vercel_url}/widget.js" defer></script>` : undefined
+        });
+      }
+
+      toast.success(`Loaded agent "${agent.name}" for editing`);
     } catch (error: any) {
+      console.error('Error loading agent for edit:', error);
       toast.error('Failed to load agent: ' + error.message);
       navigate('/dashboard');
+    }
+  };
+
+  const validateSubdomainAsync = async (subdomain: string) => {
+    if (!subdomain) return;
+    
+    setIsValidatingSubdomain(true);
+    try {
+      const result = await validateSubdomain(subdomain);
+      setSubdomainValidation(result);
+    } catch (error) {
+      setSubdomainValidation({ isValid: false, isAvailable: false, error: 'Validation failed' });
     } finally {
-      setLoadingAgent(false);
+      setIsValidatingSubdomain(false);
     }
   };
 
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
-    
-    // Clear subdomain error when user types
-    if (field === 'subdomain') {
-      setSubdomainError('');
-    }
-  };
-
-  const handleSubdomainChange = async (value: string) => {
-    setFormData(prev => ({ ...prev, subdomain: value }));
-    setSubdomainError('');
-
-    if (!value.trim()) return;
-
-    setSubdomainChecking(true);
-    try {
-      const validation = await validateSubdomain(value);
-      if (!validation.isValid || !validation.isAvailable) {
-        setSubdomainError(validation.error || 'Subdomain not available');
-      }
-    } catch (error) {
-      setSubdomainError('Error checking subdomain availability');
-    } finally {
-      setSubdomainChecking(false);
-    }
   };
 
   const handleServiceChange = (index: number, value: string) => {
@@ -321,8 +319,8 @@ export const Create: React.FC = () => {
 
   const resetDeploymentSteps = () => {
     setDeploymentSteps([
-      { id: 'step-1', title: isEditMode ? 'Update Agent Code' : 'Generate Agent Code', status: 'pending' },
-      { id: 'step-2', title: isEditMode ? 'Update Repository' : 'Upload to Repository', status: 'pending' },
+      { id: 'step-1', title: 'Generate Agent Code', status: 'pending' },
+      { id: 'step-2', title: 'Upload to Repository', status: 'pending' },
       { id: 'step-3', title: 'Deploy to Cloud', status: 'pending' },
     ]);
   };
@@ -356,15 +354,96 @@ export const Create: React.FC = () => {
       toast.error('Custom model name is required');
       return false;
     }
-    if (!isEditMode && !formData.subdomain.trim()) {
-      toast.error('Subdomain is required');
-      return false;
-    }
-    if (subdomainError) {
-      toast.error(subdomainError);
+    if (!isEditMode && (!subdomainValidation.isValid || !subdomainValidation.isAvailable)) {
+      toast.error(subdomainValidation.error || 'Invalid subdomain');
       return false;
     }
     return true;
+  };
+
+  // Check if form has been modified (for edit mode)
+  const hasFormChanged = () => {
+    if (!isEditMode || !originalFormData) return true;
+    
+    return JSON.stringify(formData) !== JSON.stringify(originalFormData);
+  };
+
+  // Unified Update Agent function
+  const handleUpdateAgent = async () => {
+    if (!validateForm()) return;
+    if (!user) {
+      toast.error('Please sign in to continue');
+      return;
+    }
+
+    if (isEditMode && !hasFormChanged()) {
+      toast.error('No changes detected. Please modify the agent before updating.');
+      return;
+    }
+
+    setIsDeploying(true);
+    setButtonLoading('updateAgent', true);
+    setShowDeployment(true);
+
+    try {
+      if (isEditMode) {
+        // Update existing agent
+        updateDeploymentStep('step-1', 'loading', 'Detecting changes and updating agent...');
+
+        // Update agent in database
+        const { error: updateError } = await supabase
+          .from('agents')
+          .update({
+            name: formData.name,
+            brand_name: formData.brandName,
+            website_name: formData.websiteName,
+            agent_type: formData.agentType,
+            role_description: formData.roleDescription,
+            services: formData.services.filter(s => s.trim()),
+            faqs: formData.faqs.filter(faq => faq.question.trim() && faq.answer.trim()),
+            primary_color: formData.primaryColor,
+            tone: formData.tone,
+            avatar_url: formData.avatarUrl,
+            office_hours: formData.officeHours,
+            knowledge: formData.knowledge,
+            api_provider: formData.apiProvider,
+            api_key: formData.apiKey,
+            model: formData.model === 'custom' ? formData.customModel : formData.model,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', currentAgentId);
+
+        if (updateError) throw updateError;
+
+        updateDeploymentStep('step-1', 'success', 'Agent updated in database');
+        updateDeploymentStep('step-2', 'loading', 'Regenerating code and pushing to repository...');
+
+        // Regenerate and push to existing repository
+        const result = await regenerateAgent(currentAgentId!);
+
+        if (result.success) {
+          updateDeploymentStep('step-2', 'success', 'Code updated and pushed to repository');
+          updateDeploymentStep('step-3', 'success', 'Changes deployed automatically');
+          
+          setDeploymentResult(prev => ({ ...prev, ...result }));
+          setOriginalFormData({ ...formData }); // Update original data
+          
+          toast.success('Agent updated successfully! Changes are being deployed.');
+        } else {
+          updateDeploymentStep('step-2', 'error', result.error);
+          toast.error(result.error || 'Failed to update agent');
+        }
+      } else {
+        // Create new agent (existing logic)
+        await handleGenerateCode();
+      }
+    } catch (error: any) {
+      updateDeploymentStep('step-1', 'error', error.message);
+      toast.error('Failed to update agent: ' + error.message);
+    } finally {
+      setIsDeploying(false);
+      setButtonLoading('updateAgent', false);
+    }
   };
 
   const handleGenerateCode = async () => {
@@ -380,40 +459,37 @@ export const Create: React.FC = () => {
     resetDeploymentSteps();
 
     try {
-      updateDeploymentStep('step-1', 'loading', isEditMode ? 'Updating agent code...' : 'Generating agent code...');
+      updateDeploymentStep('step-1', 'loading', 'Generating agent code...');
+
+      // Ensure subdomain is generated if not already
+      const finalSubdomain = formData.subdomain || generateSubdomainFromBrand(formData.brandName);
 
       // Use custom model if selected
       const finalModel = formData.model === 'custom' ? formData.customModel : formData.model;
 
       const config = {
         ...formData,
+        subdomain: finalSubdomain,
         model: finalModel,
         services: formData.services.filter(s => s.trim()),
         faqs: formData.faqs.filter(faq => faq.question.trim() && faq.answer.trim()),
         userId: user.id,
       };
 
-      let result;
-      if (isEditMode && currentAgentId) {
-        // Update existing agent
-        result = await regenerateAgent(currentAgentId);
-      } else {
-        // Create new agent
-        result = await generateAgentCode(config);
-      }
+      const result = await generateAgentCode(config);
 
       if (result.success) {
-        updateDeploymentStep('step-1', 'success', isEditMode ? 'Agent code updated successfully' : 'Agent code generated successfully');
+        updateDeploymentStep('step-1', 'success', 'Agent code generated successfully');
         setCurrentAgentId(result.agentId!);
         setDeploymentResult(result);
-        toast.success(isEditMode ? 'Agent updated successfully!' : 'Agent code generated successfully!');
+        toast.success('Agent code generated successfully!');
       } else {
         updateDeploymentStep('step-1', 'error', result.error);
-        toast.error(result.error || (isEditMode ? 'Failed to update agent' : 'Failed to generate agent code'));
+        toast.error(result.error || 'Failed to generate agent code');
       }
     } catch (error: any) {
       updateDeploymentStep('step-1', 'error', error.message);
-      toast.error(isEditMode ? 'Failed to update agent' : 'Failed to generate agent code');
+      toast.error('Failed to generate agent code');
     } finally {
       setIsDeploying(false);
       setButtonLoading('generateCode', false);
@@ -422,7 +498,7 @@ export const Create: React.FC = () => {
 
   const handleUploadToRepo = async () => {
     if (!currentAgentId) {
-      toast.error(isEditMode ? 'Please update agent code first' : 'Please generate agent code first');
+      toast.error('Please generate agent code first');
       return;
     }
 
@@ -430,26 +506,21 @@ export const Create: React.FC = () => {
     setButtonLoading('uploadRepo', true);
 
     try {
-      updateDeploymentStep('step-2', 'loading', isEditMode ? 'Updating repository...' : 'Creating repository...');
+      updateDeploymentStep('step-2', 'loading', 'Creating repository...');
 
       const result = await uploadToGitHub(currentAgentId);
 
       if (result.success) {
-        updateDeploymentStep('step-2', 'success', isEditMode ? 'Repository updated successfully' : 'Uploaded to repository successfully');
+        updateDeploymentStep('step-2', 'success', 'Uploaded to repository successfully');
         setDeploymentResult(prev => ({ ...prev, ...result }));
-        toast.success(isEditMode ? 'Repository updated successfully!' : 'Code uploaded to repository successfully!');
-        
-        // For edit mode, automatically trigger deployment after repo update
-        if (isEditMode) {
-          toast.success('Changes deployed automatically!', { icon: '🚀' });
-        }
+        toast.success('Code uploaded to repository successfully!');
       } else {
         updateDeploymentStep('step-2', 'error', result.error);
-        toast.error(result.error || (isEditMode ? 'Failed to update repository' : 'Failed to upload to repository'));
+        toast.error(result.error || 'Failed to upload to repository');
       }
     } catch (error: any) {
       updateDeploymentStep('step-2', 'error', error.message);
-      toast.error(isEditMode ? 'Failed to update repository' : 'Failed to upload to repository');
+      toast.error('Failed to upload to repository');
     } finally {
       setIsDeploying(false);
       setButtonLoading('uploadRepo', false);
@@ -464,8 +535,6 @@ export const Create: React.FC = () => {
 
     setIsDeploying(true);
     setButtonLoading('deployCloud', true);
-    setDeployCloudClickTime(Date.now());
-    setTriggerCountdown(30);
 
     try {
       updateDeploymentStep('step-3', 'loading', 'Deploying to cloud...');
@@ -476,10 +545,37 @@ export const Create: React.FC = () => {
         updateDeploymentStep('step-3', 'success', 'Deployed to cloud successfully');
         setDeploymentResult(prev => ({ ...prev, ...result }));
         toast.success('Agent deployed successfully!');
-        setTriggerCountdown(0); // Reset countdown on success
+        
+        // Start countdown for trigger button
+        setCountdownSeconds(30);
+        const countdown = setInterval(() => {
+          setCountdownSeconds(prev => {
+            if (prev <= 1) {
+              clearInterval(countdown);
+              setButtonStates(prevStates => ({ ...prevStates, makeItLive: true }));
+              return 0;
+            }
+            return prev - 1;
+          });
+        }, 1000);
       } else {
         updateDeploymentStep('step-3', 'error', result.error);
         toast.error('Failed to deploy to cloud');
+        
+        // Show trigger button if deployment is pending
+        if (result.vercelUrl) {
+          setCountdownSeconds(30);
+          const countdown = setInterval(() => {
+            setCountdownSeconds(prev => {
+              if (prev <= 1) {
+                clearInterval(countdown);
+                setButtonStates(prevStates => ({ ...prevStates, makeItLive: true }));
+                return 0;
+              }
+              return prev - 1;
+            });
+          }, 1000);
+        }
       }
     } catch (error: any) {
       updateDeploymentStep('step-3', 'error', error.message);
@@ -510,7 +606,6 @@ export const Create: React.FC = () => {
         if (result.vercelUrl) {
           setDeploymentResult(prev => ({ ...prev, ...result }));
         }
-        setTriggerCountdown(0); // Reset countdown
       } else {
         toast.error(result.error || 'Failed to trigger deployment', { id: 'make-live' });
       }
@@ -552,7 +647,8 @@ export const Create: React.FC = () => {
   const isGenerateCodeDisabled = buttonStates.generateCode || isDeploying;
   const isUploadRepoDisabled = buttonStates.uploadRepo || isDeploying || deploymentSteps[0]?.status !== 'success';
   const isDeployCloudDisabled = buttonStates.deployCloud || isDeploying || deploymentSteps[1]?.status !== 'success';
-  const isMakeItLiveDisabled = buttonStates.makeItLive || !deploymentResult?.githubRepo || triggerCountdown > 0;
+  const isMakeItLiveDisabled = buttonStates.makeItLive || !deploymentResult?.githubRepo || countdownSeconds > 0;
+  const isUpdateAgentDisabled = buttonStates.updateAgent || isDeploying || (isEditMode && !hasFormChanged());
 
   if (!user) {
     return (
@@ -577,17 +673,6 @@ export const Create: React.FC = () => {
     );
   }
 
-  if (loadingAgent) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-white dark:bg-[#0A0A0A] pt-16 transition-colors duration-300">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-yellow-500 mx-auto mb-4"></div>
-          <p className="text-gray-600 dark:text-gray-400">Loading agent...</p>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen bg-white dark:bg-[#0A0A0A] pt-16 transition-colors duration-300">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -606,7 +691,7 @@ export const Create: React.FC = () => {
             </h1>
             <p className="text-xl text-gray-600 dark:text-gray-400 max-w-3xl mx-auto">
               {isEditMode 
-                ? 'Update your AI assistant\'s configuration and deploy the changes.'
+                ? 'Update your intelligent AI assistant configuration and deploy changes instantly.'
                 : 'Design, customize, and deploy your intelligent AI assistant in minutes. No coding required.'
               }
             </p>
@@ -688,37 +773,70 @@ export const Create: React.FC = () => {
                   />
                 </div>
 
-                {/* Subdomain Input */}
+                {/* Subdomain Display */}
                 <div className="mt-6">
-                  <div className="relative">
-                    <Input
-                      label="Subdomain"
-                      value={formData.subdomain}
-                      onChange={(e) => handleSubdomainChange(e.target.value)}
-                      placeholder="your-brand"
-                      required={!isEditMode}
-                      disabled={isEditMode} // Disable editing subdomain in edit mode
-                      error={subdomainError}
-                    />
-                    {subdomainChecking && (
-                      <div className="absolute right-3 top-8">
-                        <div className="w-4 h-4 border-2 border-yellow-500 border-t-transparent rounded-full animate-spin"></div>
-                      </div>
-                    )}
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    {isEditMode ? 'Subdomain (Cannot be changed)' : 'Subdomain'}
+                  </label>
+                  <div className="flex items-center space-x-2">
+                    <div className="flex-1">
+                      <Input
+                        value={formData.subdomain}
+                        onChange={(e) => !isEditMode && handleInputChange('subdomain', e.target.value)}
+                        placeholder="your-brand-name"
+                        disabled={isEditMode}
+                        className={isEditMode ? 'bg-gray-100 dark:bg-gray-800 cursor-not-allowed' : ''}
+                      />
+                    </div>
+                    <span className="text-gray-600 dark:text-gray-400">.pludo.online</span>
                   </div>
-                  <div className="mt-2 p-3 bg-blue-50 dark:bg-blue-500/10 rounded-lg">
-                    <div className="flex items-center">
-                      <Globe className="w-4 h-4 text-blue-600 dark:text-blue-400 mr-2" />
-                      <div className="text-xs text-blue-800 dark:text-blue-200">
-                        <strong>Your agent will be available at:</strong> {formData.subdomain || 'your-subdomain'}.pludo.online
-                        {isEditMode && (
-                          <div className="mt-1 text-blue-600 dark:text-blue-300">
-                            <strong>Note:</strong> Subdomain cannot be changed after creation
-                          </div>
-                        )}
+                  
+                  {!isEditMode && (
+                    <>
+                      {isValidatingSubdomain && (
+                        <div className="mt-2 flex items-center text-sm text-gray-500">
+                          <div className="w-4 h-4 border-2 border-yellow-500 border-t-transparent rounded-full animate-spin mr-2" />
+                          Checking availability...
+                        </div>
+                      )}
+                      
+                      {!isValidatingSubdomain && formData.subdomain && (
+                        <div className={`mt-2 text-sm ${
+                          subdomainValidation.isValid && subdomainValidation.isAvailable
+                            ? 'text-green-600 dark:text-green-400'
+                            : 'text-red-600 dark:text-red-400'
+                        }`}>
+                          {subdomainValidation.isValid && subdomainValidation.isAvailable
+                            ? '✓ Subdomain is available'
+                            : subdomainValidation.error
+                          }
+                        </div>
+                      )}
+                    </>
+                  )}
+                  
+                  {isEditMode && (
+                    <p className="text-xs text-gray-500 mt-1">
+                      Subdomain cannot be changed after creation to maintain URL consistency
+                    </p>
+                  )}
+                  
+                  {formData.subdomain && (
+                    <div className="mt-2 p-3 bg-blue-50 dark:bg-blue-500/10 rounded-lg">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-blue-800 dark:text-blue-200">
+                          Your agent will be available at: <strong>{constructPludoUrl(formData.subdomain)}</strong>
+                        </span>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => copyToClipboard(constructPludoUrl(formData.subdomain))}
+                        >
+                          <Copy className="w-4 h-4" />
+                        </Button>
                       </div>
                     </div>
-                  </div>
+                  )}
                 </div>
               </div>
             </motion.div>
@@ -813,7 +931,7 @@ export const Create: React.FC = () => {
                     </div>
                   )}
 
-                  {/* API Key Input with visibility toggle */}
+                  {/* API Key Input */}
                   <div>
                     <div className="relative">
                       <Input
@@ -821,14 +939,14 @@ export const Create: React.FC = () => {
                         type={showApiKey ? 'text' : 'password'}
                         value={formData.apiKey}
                         onChange={(e) => handleInputChange('apiKey', e.target.value)}
-                        placeholder={`Enter your ${getCurrentProvider()?.name} API key`}
+                        placeholder={formData.apiKey ? '••••••••••••••••' : `Enter your ${getCurrentProvider()?.name} API key`}
                         icon={<Shield className="w-5 h-5 text-gray-400" />}
                         required
                       />
                       <button
                         type="button"
                         onClick={() => setShowApiKey(!showApiKey)}
-                        className="absolute right-3 top-8 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 z-10"
+                        className="absolute right-3 top-8 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
                       >
                         {showApiKey ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                       </button>
@@ -1117,30 +1235,39 @@ export const Create: React.FC = () => {
                   </div>
 
                   <div className="space-y-3">
-                    <Button
-                      onClick={handleGenerateCode}
-                      disabled={isGenerateCodeDisabled}
-                      className="w-full bg-gradient-to-r from-gray-800 to-gray-700 dark:from-yellow-500 dark:to-yellow-400 hover:from-gray-700 hover:to-gray-600 dark:hover:from-yellow-400 dark:hover:to-yellow-300 text-white dark:text-black font-bold"
-                      loading={buttonStates.generateCode}
-                    >
-                      {isEditMode ? <Save className="w-4 h-4 mr-2" /> : <Code className="w-4 h-4 mr-2" />}
-                      {isEditMode ? 'Update Agent' : 'Generate Agent Code'}
-                    </Button>
-
-                    <Button
-                      onClick={handleUploadToRepo}
-                      disabled={isUploadRepoDisabled}
-                      variant="outline"
-                      className="w-full"
-                      loading={buttonStates.uploadRepo}
-                    >
-                      <Github className="w-4 h-4 mr-2" />
-                      {isEditMode ? 'Update Repository' : 'Upload to Repository'}
-                    </Button>
-
-                    {/* Only show deploy and trigger buttons for new agents */}
-                    {!isEditMode && (
+                    {isEditMode ? (
+                      <Button
+                        onClick={handleUpdateAgent}
+                        disabled={isUpdateAgentDisabled}
+                        className="w-full bg-gradient-to-r from-gray-800 to-gray-700 dark:from-yellow-500 dark:to-yellow-400 hover:from-gray-700 hover:to-gray-600 dark:hover:from-yellow-400 dark:hover:to-yellow-300 text-white dark:text-black font-bold"
+                        loading={buttonStates.updateAgent}
+                      >
+                        <RefreshCw className="w-4 h-4 mr-2" />
+                        {hasFormChanged() ? 'Update Agent' : 'No Changes Detected'}
+                      </Button>
+                    ) : (
                       <>
+                        <Button
+                          onClick={handleGenerateCode}
+                          disabled={isGenerateCodeDisabled}
+                          className="w-full bg-gradient-to-r from-gray-800 to-gray-700 dark:from-yellow-500 dark:to-yellow-400 hover:from-gray-700 hover:to-gray-600 dark:hover:from-yellow-400 dark:hover:to-yellow-300 text-white dark:text-black font-bold"
+                          loading={buttonStates.generateCode}
+                        >
+                          <Code className="w-4 h-4 mr-2" />
+                          Generate Agent Code
+                        </Button>
+
+                        <Button
+                          onClick={handleUploadToRepo}
+                          disabled={isUploadRepoDisabled}
+                          variant="outline"
+                          className="w-full"
+                          loading={buttonStates.uploadRepo}
+                        >
+                          <Github className="w-4 h-4 mr-2" />
+                          Upload to Repository
+                        </Button>
+
                         <Button
                           onClick={handleDeployToCloud}
                           disabled={isDeployCloudDisabled}
@@ -1152,7 +1279,7 @@ export const Create: React.FC = () => {
                           Deploy to Cloud
                         </Button>
 
-                        {/* Make it Live Button with countdown */}
+                        {/* Make it Live Button with Countdown */}
                         {deploymentResult?.githubRepo && (
                           <Button
                             onClick={handleMakeItLive}
@@ -1161,7 +1288,7 @@ export const Create: React.FC = () => {
                             loading={buttonStates.makeItLive}
                           >
                             <Zap className="w-4 h-4 mr-2" />
-                            {triggerCountdown > 0 ? `Trigger Deployment (${triggerCountdown}s)` : 'Trigger Deployment'}
+                            {countdownSeconds > 0 ? `Trigger Deployment (${countdownSeconds}s)` : 'Trigger Deployment'}
                           </Button>
                         )}
                       </>
@@ -1190,7 +1317,10 @@ export const Create: React.FC = () => {
                           </div>
                           <div className="flex-1 min-w-0">
                             <div className="text-sm font-medium text-gray-900 dark:text-white">
-                              {step.title}
+                              {isEditMode && step.id === 'step-1' ? 'Update Agent Configuration' :
+                               isEditMode && step.id === 'step-2' ? 'Push Changes to Repository' :
+                               isEditMode && step.id === 'step-3' ? 'Auto-Deploy Changes' :
+                               step.title}
                             </div>
                             {step.message && (
                               <div className={`text-xs mt-1 ${
